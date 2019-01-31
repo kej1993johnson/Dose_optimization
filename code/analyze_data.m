@@ -76,3 +76,5 @@ for i =1:length(traj)
     title('Resistant growth rate versus number of doses')
     end
 end
+
+%% Test to see if git works
