@@ -1,6 +1,8 @@
 % This script analyzes the MCF-7 data-- lot that can be done here
 % So far just wanted to plot some things
 
+% THIS IS A TEST
+
 close all; clear all; clc;
 %% Load in data structure 
 S = load('../out/trajfit.mat');
