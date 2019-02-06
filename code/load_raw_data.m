@@ -211,8 +211,8 @@ for i = sz(1,3)+1:sz(2,3) % size matrix, first row, second column
     cond3_2 = { 'B7', 'C7', 'D7','E7', 'F7','G7'};
     cond2_3 = { 'B8', 'C8', 'D8','E8', 'F8','G8'};
     cond2_2 = { 'B9', 'C9', 'D9','E9', 'F9','G9'};
-    cond2_1 = { 'B10', 'C10', 'D10','E10', 'F10','G10'};
-    condUT = { 'B11', 'C11', 'D11','E11', 'F11','G11'};
+    condUT = { 'B10', 'C10', 'D10','E10', 'F10','G10'};
+    cond2_1 = { 'B11', 'C11', 'D11','E11', 'F11','G11'};
     
     if contains(traj(i).well, cond4_4 )
         traj(i).dose = 75;
@@ -355,7 +355,7 @@ for i = sz(2,3)+55:sz(3,3) % size matrix, first row, second column
     traj(i).doseduration = [];
     traj(i).tdose = 73;
 end
-  %%  
+  %%  Single Dose
     % Need to write in a little "key" for this data set to match wells to
     % their experimental condition. This is the relatively tedious part....
     % Need to go through original excel sheet and code in which wells
