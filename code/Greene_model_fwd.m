@@ -36,7 +36,7 @@ Cdox = 75; % nm doxorubicin
 rs = 0.01;
 rr = 0.005;
 ds = 0.002;
-dr = 0.0005;
+dr = 0;
 alpha = 0.0001;
 kdrug = 0.025;
 N(1) = S(1)+R(1);
@@ -54,15 +54,15 @@ for t = 2:tend
     R(t) = R(t-1) + dt *(growth_r - death_r + trans_s);
     N(t) = S(t) + R(t);
 end
-Ncrit = N(1)*1.2;
+Ncrit = N(1)*2;
 
 icrit = find(N>Ncrit,1, 'first');
 tcrit= ttot(icrit);
 
 subplot(1,2,1)
-plot(1:t,N,'LineWidth',3, 'color','g');
+plot(1:t,N,'LineWidth',3, 'color','b');
 hold on
-plot(1:t, S, 'LineWidth', 3,'color', 'b')
+plot(1:t, S, 'LineWidth', 3,'color', 'g')
 plot(1:t, R, 'LineWidth', 3, 'color', 'r')
 plot(tcrit, Ncrit, 'k*')
 legend('total cell number', 'sensitive', 'resistant', 'critical N', 'Location', 'NorthWest')
@@ -96,7 +96,7 @@ ttot = 1:dt:tend;
 tvec = ttot; % time vector of data measurements
 U=k*Cdox*exp(-kdrug*(ttot'-1));
 dt = 1; % how frequently to update model
-Ncrit = (S0+R0)*1.2;
+Ncrit = (S0+R0)*2;
 
 % Look at tcrit as a function of dose
 Cdoxvec = [10:10:250];
@@ -126,14 +126,16 @@ legend boxoff
 title('Dox concentration vs. tritical time for different drug induction rates (\alpha)')
 
 
-%%
+%% Plot example for a single alpha
+
 figure;
+
 for i = 1:length(Cdoxvec)
 subplot(1,2,1)
 plot(tvec,Nsr(:,1,i),'LineWidth',3);
 hold on
 
-plot(tcrit(i), Ncrit, 'k*')
+plot(tcrit(i,end), Ncrit, 'k*')
 legend(['Cdox =', num2str(Cdoxvec(i)),' nM'])
 legend boxoff
 xlabel('Time (hours)','FontSize',20)
@@ -150,8 +152,3 @@ ylabel('Effective dose','FontSize',20)
 set(gca,'FontSize',20,'LineWidth',1.5)
 end
 
-figure;
-plot(Cdoxvec, tcrit,'k*-', 'LineWidth',3)
-xlabel('Concentration Dox','FontSize',20)
-ylabel('t_{crit}','FontSize',20)
-set(gca,'FontSize',20,'LineWidth',1.5)

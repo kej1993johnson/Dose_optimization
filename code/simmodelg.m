@@ -1,4 +1,4 @@
-function [Y] = simmodelg(p,T)
+function [Y] = simmodelg(p,T, V_0)
 % SIMMODEL returns Y values corresponding to times T for parameter vector p
 % for single exponential model
 
@@ -9,7 +9,7 @@ function [Y] = simmodelg(p,T)
 % * g>0 is the growth rate on all cells
 
 P = num2cell(p); 
-[V_0, g] = deal(P{:}); % our parameters
+[ g] = deal(P{:}); % our parameters
 
 TT = T';
 Ntimes = length(TT);

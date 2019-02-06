@@ -1,4 +1,4 @@
-function [Y] = simmodel2(p,T)
+function [Y] = simmodel2(p,T, V_0)
 % SIMMODEL returns Y values corresponding to times T for parameter vector p
 % for double exponential model
 
@@ -10,14 +10,14 @@ function [Y] = simmodel2(p,T)
 % * k>0 is the kill rate (actually -net "growth rate" on treatment) on sensitive cells
 
 P = num2cell(p); 
-[V_0, phi, g, k] = deal(P{:}); % our parameters
+[phi, g, k] = deal(P{:}); % our parameters
 
 TT = T;
 Ntimes = length(TT);
 
 % initialize solutions
 
-Y(1,1) = (V_0.*((1-phi)*exp(-k*TT(1)) + phi*exp(g*TT(1))));
+%Y(1,1) = (V_0.*((1-phi)*exp(-k*TT(1)) + phi*exp(g*TT(1))));
 
 for j = 1:length(TT)
     if TT(j)<=0

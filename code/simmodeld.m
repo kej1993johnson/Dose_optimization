@@ -1,4 +1,4 @@
-function [Y] = simmodeld(p,T)
+function [Y] = simmodeld(p,T, V_0)
 % SIMMODEL returns Y values corresponding to times T for parameter vector p
 % for single exponential model
 
@@ -9,7 +9,7 @@ function [Y] = simmodeld(p,T)
 % * k>0 is the kill rate (actually -net "growth rate" on treatment) on all cells
 
 P = num2cell(p); 
-[V_0, k] = deal(P{:}); % our parameters
+[k] = deal(P{:}); % our parameters
 
 TT = T';
 Ntimes = length(TT);
