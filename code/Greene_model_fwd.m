@@ -108,7 +108,8 @@ for i = 1:length(Cdoxvec)
 U(:,i)=k*Cdoxvec(i)*exp(-kdrug*(ttot'-1));
 pj = p;
 pj(5) = alphavec(j);
-[Nsr(:,:,i), tcrit(i,j)] = fwd_Greene_model(pj, tvec, U(:,i), dt, Ncrit);
+tdrug = 1;
+[Nsr(:,:,i), tcrit(i,j), Ncrit(i,j)] = fwd_Greene_model(pj, tvec, U(:,i), dt, tdrug);
 end
 end
 
@@ -135,7 +136,7 @@ subplot(1,2,1)
 plot(tvec,Nsr(:,1,i),'LineWidth',3);
 hold on
 
-plot(tcrit(i,end), Ncrit, 'k*')
+plot(tcrit(i,end), Ncrit(i,end), 'k*')
 legend(['Cdox =', num2str(Cdoxvec(i)),' nM'])
 legend boxoff
 xlabel('Time (hours)','FontSize',20)

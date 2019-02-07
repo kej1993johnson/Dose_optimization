@@ -114,7 +114,7 @@ for i = 1:length(traj)
     N0 = traj(i).Nfit(1);
     N = traj(i).Nfit;
     tfit = traj(i).tfit;
-    Ncrit= 2*N0;
+    Ncrit= 1.2*N0;
     traj(i).Ncrit = Ncrit;
     icrit = find(N>Ncrit,1, 'first');
     if ~isempty(icrit)

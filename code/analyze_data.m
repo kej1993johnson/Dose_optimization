@@ -79,4 +79,24 @@ for i =1:length(traj)
     end
 end
 
-%% Test to see if git works
+%% Plot tcrit versus number of doses
+figure;
+for i = 1:length(traj)
+    hold on
+    if ~isempty(traj(i).tcrit)
+    if traj(i).dose == 75 && traj(i).dosenum ==1
+        plot(traj(i).accdose, traj(i).tcrit, 'k*', 'LineWidth',3)
+    end
+    if traj(i).dose == 75 && traj(i).dosenum == 2 && traj(i).WPT ==2
+        plot(traj(i).accdose, traj(i).tcrit, 'k*', 'LineWidth',3)
+    end
+    if traj(i).dose == 75 && traj(i).dosenum == 3 && traj(i).WPT == 2
+        if traj(i).doseints(1)==2 
+        plot(traj(i).accdose, traj(i).tcrit, 'k*', 'LineWidth', 3)
+        end
+    end
+    end
+end
+title('T_{crit} for 75 nM pulse every two weeks', 'FontSize', 20)
+xlabel('Accumulated Dose (nM)', 'FontSize', 20)
+ylabel('T_{crit} (N>1.2*N_{treat})', 'FontSize',20)
