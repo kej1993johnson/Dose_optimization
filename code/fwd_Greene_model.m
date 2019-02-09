@@ -50,5 +50,7 @@ for i = 1:length(tdrug)
         tcrit(i)= ttot(icrit);
     end
 end
+    ikeep = find(ismember(tvec,ttot));
+    Nsr = Nsr(ikeep,:);
 
 end

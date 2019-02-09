@@ -469,7 +469,7 @@ end
     end
     if contains(traj(i).well, condUT )
         traj(i).dose = 0;
-        traj(i).dosenum = [];
+        traj(i).dosenum = 0;
         traj(i).WPT = [];
         traj(i).prevdose = []; 
         traj(i).doseints = [];

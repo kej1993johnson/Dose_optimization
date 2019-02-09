@@ -92,9 +92,10 @@ p = [ pset, pfit];
 
 % Other inputs that will be known
 tend = 1500; % monitor for 500 hours
-ttot = 1:dt:tend;
-tvec = ttot; % time vector of data measurements
-U=k*Cdox*exp(-kdrug*(ttot'-1));
+ttot = 1:2:tend;
+tvec = ttot; % time vector of data measurements (Can vary from dt)
+ttest = 1:dt:tend;
+U=k*Cdox*exp(-kdrug*(ttest'-1)); % U needs to be in terms of dt 
 dt = 1; % how frequently to update model
 Ncrit = (S0+R0)*2;
 
@@ -105,7 +106,7 @@ Nsr = [];
 tcrit = [];
 for j = 1:length(alphavec)
 for i = 1:length(Cdoxvec)
-U(:,i)=k*Cdoxvec(i)*exp(-kdrug*(ttot'-1));
+U(:,i)=k*Cdoxvec(i)*exp(-kdrug*(ttest'-1));
 pj = p;
 pj(5) = alphavec(j);
 tdrug = 1;
