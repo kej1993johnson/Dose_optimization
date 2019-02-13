@@ -1,19 +1,17 @@
-function [Nsr, tcrit, Ncrit] = fwd_Greene_model(p, tvec, U, dt,tdrug)
+function [Nsrdat, tcrit, Ncrit] = fwd_Greene_model(p, tvec, U, dt,tdrug)
 % This function runs the Greene model of S & R cells with drug-induced
 % resistance forward
 
 P = num2cell(p); 
 [S0, R0, rs, carcap, alpha, rr, ds, dr] = deal(P{:}); % our parameters
 tend = tvec(end);
-ttot = 1:dt:tend;
-S = zeros([length(ttot),1]);
-R = zeros([length(ttot),1]);
-N = zeros([length(ttot),1]);
+ttot = (0:dt:tend)';
+
 S(1)=S0; 
 R(1) = R0; 
 N(1) = S(1) + R(1);
 
-for t = 2:tend
+for t = 2:length(ttot)
     growth_s = rs*S(t-1)*(1-((S(t-1)+R(t-1))/carcap));
     growth_r = rr*R(t-1)*(1-((S(t-1)+R(t-1))/carcap));
     death_s = ds*U(t-1)*S(t-1);
@@ -26,9 +24,9 @@ for t = 2:tend
 
 end
 
-Nsr = horzcat(N, S, R);
- ikeep = find(ismember(tvec,ttot));
- Nsr= Nsr(ikeep,:);
+Nsr = horzcat(N', S', R');
+ ikeep = find(ismember(ttot,tvec));
+ Nsrdat= Nsr(ikeep,:);
 
  % find multiple critical times
 for i = 1:length(tdrug)
@@ -50,7 +48,6 @@ for i = 1:length(tdrug)
         tcrit(i)= ttot(icrit);
     end
 end
-    ikeep = find(ismember(tvec,ttot));
-    Nsr = Nsr(ikeep,:);
+
 
 end

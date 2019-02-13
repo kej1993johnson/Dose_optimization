@@ -6,24 +6,22 @@
 close all; clear all; clc
 %%
 dt = 1; % this corresponds to hours
-carcap = 2e4; % K
+carcap = 5e4; % K
 t1 = 336; % 2 weeks
-t1vec = (1:dt:t1)';
-S = zeros([t1,1]);
-R = zeros([t1,1]);
-N = zeros([t1,1]);
+t1vec = (0:4:t1)';
+
 S(1)=2e3; % set initial conditions (assume all cells sensitive to start)
 R(1) = 0; 
-Cdox(1) = 75; % nm doxorubicin
-rs = 0.01;
-rr = 0.001;
+Cdox(1) = 50; % nm doxorubicin
+rs = 0.0287;
+rr = 0.01;
 ds = 0.0015;
 dr = 0;
 alpha = 0.0001;
-kdrug = 0.025;
+kdrug = 0.015;
 N(1) = S(1)+R(1);
 t = 1; % time in hours
-k = 0.5; 
+k = 1; 
 
 
 S0 = S(1);
@@ -31,9 +29,21 @@ R0 = R(1);
 pset = [S0, R0, rs, carcap];
 pfit = [ alpha, rr, ds, dr];
 p = [ pset, pfit];
+%% Run to run simulations on fitted parameters
+pload =  load('../out/pall.mat');
+pload = struct2cell(pload);
+pload = cell2mat(pload);
 
+P = num2cell(pload); 
+ [rs, carcap, props, dr, alpha, rr, ds]= deal(P{:}); % our parameters
+
+pset = [S0, R0, rs, carcap];
+pfit = [ alpha, rr, ds, dr];
+p = [ pset, pfit];
+%%
 % U(t) for a single pulse dose
-U1=k*Cdox*exp(-kdrug*(t1vec-1)); % minus one because t starts at 1
+ttest = 0:dt:t1;
+U1=(k*Cdox*exp(-kdrug*(ttest)))'; % minus one because t starts at 1
 tdrug1 =1;
 
 [Nsr, tcrit, Ncrit] = fwd_Greene_model(p, t1vec, U1, dt, tdrug1);
@@ -41,6 +51,7 @@ N = Nsr(:,1);
 S = Nsr(:,2);
 R = Nsr(:,3);
 %% Plot for single dose for two weeks of monitoring
+
 figure;
 subplot(1,2,1)
 plot(t1vec,N,'LineWidth',3, 'color','b');
@@ -57,7 +68,7 @@ title('Single pulse dose response (2 weeks)')
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
-plot(t1vec, U1,'LineWidth',3)
+plot(ttest, U1,'LineWidth',3)
 xlim([ 0 t1vec(end)])
 xlabel('Time (hours)','FontSize',20)
 ylabel('Effective dose','FontSize',20)
@@ -65,13 +76,15 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 title('Pulse of 75 nM dox')
 %% Simulate second dose at two weeks
 
-t2vec = (1:1:336)'; %
-tvec = vertcat(t1vec, t2vec + t1vec(end));
+t2vec = (0:4:336)'; %
+tvec = vertcat(t1vec, t2vec(2:end) + t1vec(end));
 tdrug = [t1vec(1); (t2vec(1) + t1vec(end))];
 % set original U as U1 to indicate first dose
 
-U2 = k*Cdox*exp(-kdrug*(t2vec-1)); % minus one because t starts at 1
-U = vertcat(U1, U2);
+ttest2 = (0:dt:t2vec(end))';
+ttestvec = vertcat(ttest', (ttest2(2:end) + 336));
+U2 = k*Cdox*exp(-kdrug*(ttest2-t)); % minus one because t starts at 1
+U = vertcat(U1(1:end-1), U2);
 [Nsr, tcrit, Ncrit] = fwd_Greene_model(p, tvec, U, dt, tdrug);
 N = Nsr(:,1);
 S = Nsr(:,2);
@@ -96,8 +109,8 @@ title('Multiple treatment response')
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
-plot(tvec, U,'LineWidth',3)
-xlim([ 0 tvec(end)])
+plot(ttestvec, U,'LineWidth',3)
+xlim([ 0 ttestvec(end)])
 xlabel('Time (hours)','FontSize',20)
 ylabel('Effective dose','FontSize',20)
 set(gca,'FontSize',20,'LineWidth',1.5)

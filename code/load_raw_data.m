@@ -6,7 +6,7 @@ close all; clear all; clc
 
 % load in adjusted data set (remove top part and record relevant info
 % below)
-[N1, T1] =xlsread('../data/GH_MCF7_2nd_Dose_Vary_Interval_v1.xls');
+[N1, T1] =xlsread('../data/GH1831_MCF7_PredModel_2nd_Dose_Varying_Interval_v2.xls');
 [N2, T2] = xlsread('../data/GH1830_MCF7_PredModel_3rd_Dose_Vary_Interval_v2.xls');
 [N3, T3] = xlsread('../data/GH1818_MCF7_PredModel_1st_Dose_Analysis_v6.xls');
 [N4, T4] =xlsread('../data/GH1832_MCF7_PredModel_3rd_Dose_4-4_Intervals_v1.xls');
