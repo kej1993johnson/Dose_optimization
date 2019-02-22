@@ -277,7 +277,7 @@ modelfun1 = @(p)simmodel1(p, ytime, N0); % single exponential model with death
 rs = gs;
 dr = 0;
 carcap = carcap;
-props = 1;
+props = 1;%0.8;
 pset = [rs, carcap, props, dr];
 
 
@@ -312,7 +312,7 @@ lengthU = [];
 Uvec = [];
 
 % fit on doses 10, 20, 35, & 50 nM dox
-for i = 2:5
+for i = 2:5%length(trajsum)
 sigmafit = vertcat(sigmafit,trajsum(i).Nstd(2:end));
 ydatafit = vertcat(ydatafit, trajsum(i).Nmean(2:end));
 ytimefit = vertcat(ytimefit, trajsum(i).tvec(2:end));
@@ -341,7 +341,7 @@ plot(1:1:length(Uvec), Uvec, '*')
 
 %% INITIAL GUESSES FOR alpha, rr & ds
 
-alphaguess =  1e-4;
+alphaguess =  1e-7;
 rrguess = 0.015;
 dsguess = 1e-3;
 
@@ -381,11 +381,11 @@ dsguess = 1e-3;
     legend box off
     title ('Fit for \alpha, rr and ds')
     set(gca,'FontSize',20,'LineWidth',1.5)
-%%
+%% Plot calibrated data
 P = num2cell(pbest); 
 [alpha, rr, ds] = deal(P{:}); % our parameters
 
-p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
+p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
  figure;
  for i = 2:5%length(trajsum)
      subplot(2,1,1)
@@ -403,11 +403,56 @@ p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
         tvec = trajsum(i).tvec;
         U = trajsum(i).U;
          pi = p;
-         pi(1) = trajsum(i).Nmean(1);
-        [Nsri, tcrit, Ncrit] = fwd_Greene_model(p, tvec, U, dt, tdrug);
+         pi(1) = props*trajsum(i).Nmean(1);
+         pi(2) = (1-props)*trajsum(i).Nmean(1);
+        [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
         plot(tvec, Nsri(:,1), 'color','r', 'LineWidth',2)
-        plot(tcrit, Ncrit, '*', 'LineWidth',2)
-        text(tcrit +5, Ncrit + 5, ['t_{crit}=', num2str(tcrit),' hours'])
+        %plot(tcrit, Ncrit, '*', 'LineWidth',2)
+        %text(tcrit +5, Ncrit + 5, ['t_{crit}=', num2str(tcrit),' hours'])
+        text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
+        set(gca,'FontSize',20,'LineWidth',1.5)
+        trajsum(i).Nmod1pulse = Nsri;
+
+
+
+        subplot(2,1,2)
+       ttest = [];
+       ttest = 0:dt:trajsum(i).tvec(end);
+       plot(ttest, trajsum(i).U,'.', 'color',trajsum(i).color, 'LineWidth',1)
+        hold on
+        xlabel('time (hours)')
+        ylabel('Effective dose U(t)')
+        title('Effective dose of each pulse treatment')
+        set(gca,'FontSize',20,'LineWidth',1.5)
+ end
+ 
+ %% Prediction of new doses
+ % Something is wrong with the read in of N0 here...
+ figure;
+ for i = 6%:length(trajsum)
+     subplot(2,1,1)
+         plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
+         hold on
+         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+       
+         xlabel('time (hours)')
+        ylabel('N(t)')
+        title('Model prediction for pulsed treatments 75 nM')
+        dt = 1;
+        tvec = [];
+        Nsri = [];
+        tvec = trajsum(i).tvec;
+        U = trajsum(i).U;
+         pi = p;
+         pi(1) = props*trajsum(i).Nmean(1);
+         pi(2) = (1-props)*trajsum(i).Nmean(1);
+        [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
+        plot(tvec, Nsri(:,1), 'color','b', 'LineWidth',2)
+         plot(tvec, Nsri(:,2), 'color','g', 'LineWidth',2)
+         plot(tvec, Nsri(:,3), 'color','r', 'LineWidth',2)
+        %plot(tcrit, Ncrit, '*', 'LineWidth',2)
+        %text(tcrit +5, Ncrit + 5, ['t_{crit}=', num2str(tcrit),' hours'])
         text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
         set(gca,'FontSize',20,'LineWidth',1.5)
         trajsum(i).Nmod1pulse = Nsri;

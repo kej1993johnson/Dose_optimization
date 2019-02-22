@@ -19,7 +19,15 @@ for t = 2:length(ttot)
     trans_s = alpha*U(t-1)*S(t-1);
    
     S(t) = S(t-1) + dt*(growth_s - death_s - trans_s);
+    if S(t) <=0
+        S(t) = 0;
+    end
+ 
     R(t) = R(t-1) + dt *(growth_r - death_r + trans_s);
+    
+    if R(t) <=0
+        R(t) = 0;
+    end
     N(t) = S(t) + R(t);
 
 end
