@@ -51,6 +51,9 @@ sz(9,1:2) = size(N9);
 sz(9,2) = sz (9,2) - 1;
 
 sz(:,3) = cumsum(sz(:,2));
+
+raw(1).N = N1;
+raw(2).N = N2;
 %% Make structuren (1831)
 %Make one structure where each entry is a trajectory containing:
 % 1. time vector
@@ -377,10 +380,9 @@ for i = sz(2,3)+55:sz(3,3) % size matrix, first row, second column
     traj(i).doseduration = [];
     traj(i).tdose = 73;
 end
-<<<<<<< HEAD
+
   %%  Single Dose
-=======
->>>>>>> e37c770e18c9ce972504cb71c27614e9a06373aa
+
     % Need to write in a little "key" for this data set to match wells to
     % their experimental condition. This is the relatively tedious part....
     % Need to go through original excel sheet and code in which wells

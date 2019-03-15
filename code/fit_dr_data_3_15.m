@@ -8,7 +8,7 @@ traj= S.traj;
 %% Flip through raw data trajectories
 % ctrl C to end this loop without iterating through all!
 figure;
-for j = 120:length(traj)
+for j = 400:length(traj)
     plot(traj(j).time, traj(j).rawN, 'LineWidth', 2, 'color', num2str(traj(j).color))
     xlabel ('time (hours)')
     ylabel('N(t)')
