@@ -5,6 +5,8 @@ close all; clear all; clc;
 %% Load in data structure 
 S = load('../out/trajraw.mat');
 traj= S.traj;
+
+
 %% Flip through raw data trajectories
 % ctrl C to end this loop without iterating through all!
 figure;

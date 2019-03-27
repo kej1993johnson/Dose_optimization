@@ -138,7 +138,7 @@ for i = 1:length(raw) %each data set runs
                 traj(j).doseints = [];
             end
         elseif i == 3 %GH1818 single dose
-            traj(j).date = '8=16=18';
+            traj(j).date = '8-16-18';
             traj(j).tdose = 73;
             traj(j).seed = 2000;
             traj(j).dosenum = 1;

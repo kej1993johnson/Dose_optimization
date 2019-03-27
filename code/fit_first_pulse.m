@@ -7,6 +7,16 @@
  %% Load in data structure 
 S = load('../out/trajfit.mat');
 traj= S.traj;
+%% Look only at MCF-7s
+ntot = length(traj);
+%
+for i = 1:ntot
+matches= ismember(traj(i).celltype, 'MCF-7');
+ind(i) = all(matches, 'all');
+end
+trajM = traj(ind);
+traj = trajM;
+
 
 %% Separate by dose
 uniqdose = [];
@@ -32,10 +42,10 @@ uniqdose= unique(doselist);
     trajsum(i).nreps = 0;
     trajsum(i).tmat = [];
  end
-
+%%
  for i = 1:length(uniqdose) % number of unique seed numbers
     for j = 1:length(traj)
-        date = {'8-16-18'};
+        date = {'8-16-18'}; % pull from the same experiment: first treat
         if contains(traj(j).date, date)  % only want data from this run
                 if traj(j).dose == uniqdose(i)
                     trajsum(i).nreps = trajsum(i).nreps +1;
@@ -65,7 +75,7 @@ uniqdose= unique(doselist);
     if i ==1
     Nfin = 5.5e4;
     else
-    Nfin = 4.5e4;
+    Nfin = 4e4;
     end
      N = trajsum(i).Nmat;
     t = trajsum(i).tmat;
@@ -99,7 +109,7 @@ end
 % Set some arbitrary things as inputs
 
 kdrug = 0.0175;
-k = 1;
+k = 0.5;
 dt = 1;
 % input time vectors for each different dose response
 figure;
@@ -147,7 +157,7 @@ end
  end
 
 
-%%
+%% Test forward model
 % set parameters of forward model
 carcap = 5.2409e4;
 S0=trajsum(1).Nmean(1); % set initial conditions (assume all cells sensitive to start)
@@ -217,7 +227,7 @@ ytimef = trajsum(1).tvec;
 ytime = ytimef(2:end);
 
 % Set up forward models, fit all three nested versions of model
-modelfun1 = @(p)simmodel1(p, ytime, N0); % single exponential model with death  
+modelfun1 = @(p)simmodel1(p, ytime, N0); % single exponential model with carrying capacity  
 
 
     % INITIAL GUESSES BASED ON DATA
@@ -327,16 +337,8 @@ lengthvec = horzcat(lengtht, lengthU);
 % Set up forward models, fit all three nested versions of model
 
 modelfun = @(p)simmodelgreene(p, ytimefit, N0s, pset, Uvec, lengthvec); % single exponential model with death  
-%% test
-pftest = [0, 0, 0*ds];
-test = modelfun(pftest)
-figure;
-plot(ytimefit, test, '*')
-hold on
-plot(ytimefit, ydatafit, '*')
 
-figure;
-plot(1:1:length(Uvec), Uvec, '*')
+
 
 
 %% INITIAL GUESSES FOR alpha, rr & ds
@@ -425,9 +427,13 @@ p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
         title('Effective dose of each pulse treatment')
         set(gca,'FontSize',20,'LineWidth',1.5)
  end
+ %% Save calibrated parameters from MCF-7s with 4 doses 10-50 nM
+ 
+p4fit= [rs, carcap, alpha, rr, ds, dr];
+save('../out/p4fit', 'p4fit')
  
  %% Prediction of new doses
- % Something is wrong with the read in of N0 here...
+
  figure;
  for i = 6%:length(trajsum)
      subplot(2,1,1)
@@ -492,7 +498,7 @@ for i = 1:length(trajsum)
     trajsum(i).kdrug =kdrug;
 end
 
-    %%
-p = [pset, pbest];
-save('../out/pall.mat', 'p')
+%% Save the parameter estimates
+p4fit= [rs, carcap, alpha, rr, ds, dr];
+save('../out/p4fit', 'p4fit')
 save('../out/trajsumfit.mat', 'trajsum')
