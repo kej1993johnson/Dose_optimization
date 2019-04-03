@@ -1,7 +1,7 @@
 % This script loads in data sets from Grant's various experimental
 % conditions of drug response. The goal of this script is just to capture
 % the input variables and data for each well in the data set.
-close all; clear all; clc
+close all; clear all;
 % load in adjusted data set (remove top part and record relevant info
 % below)
 [raw(1).N, raw(1).T] =xlsread('../data/GH1831_MCF7_PredModel_2nd_Dose_Varying_Interval_v2.xls');
@@ -16,6 +16,8 @@ close all; clear all; clc
 [raw(10).N, raw(10).T] =xlsread('../data/GH1835_BT474_PredModel_2nd_Dose_Vary_Interval_v1.xls');
 [raw(11).N, raw(11).T] =xlsread('../data/GH1902_MCF7_PredModel_4th_Dose_4_Week_Intervals_v1.xls');
 [raw(12).N, raw(12).T] =xlsread('../data/GH1903_MCF7_PredModel_5th_Dose_4_Week_Intervals_v1.xls');
+[raw(13).N, raw(13).T] =xlsread('../data/GH1827_BT474_PredModel_3rd_Dose_2_Week_Int_v1.xls');
+[raw(14).N, raw(14).T] =xlsread('../data/GH1828_BT474_PredModel_2nd_Dose_4_WPT1_v1.xls');
 % this reads in the numeric values in an excel sheet (N1), and the text
 % values (T1)
 % Make a "size" matrix that keeps track of the number of wells and time
@@ -97,7 +99,7 @@ for i = 1:length(raw) %each data set runs
                 traj(j).doseints = [2, 4, 3, 4, 8];
                 traj(j).dosenum = 6;
                 traj(j).numdoses = 6;
-                traj(j).WPT = 8
+                traj(j).WPT = 8;
             elseif ismember(traj(j).column, '11')
                 traj(j).dosenum = 1;
                 traj(j).numdoses = 1;
@@ -114,31 +116,31 @@ for i = 1:length(raw) %each data set runs
             traj(j).prevdose = [75,75];
             traj(j).dose = 75;
             if ismember(traj(j).column, '2')
-                traj(j).doseints = [4,4]
+                traj(j).doseints = [4,4];
                 traj(j).WPT = 4;
             elseif ismember(traj(j).column, '3')
-                traj(j).doseints = [4,3]
+                traj(j).doseints = [4,3];
                 traj(j).WPT = 3;
             elseif ismember(traj(j).column, '4')
-                traj(j).doseints = [3,4]
+                traj(j).doseints = [3,4];
                 traj(j).WPT = 4;
             elseif ismember(traj(j).column, '5')
-                traj(j).doseints = [4,2]
+                traj(j).doseints = [4,2];
                 traj(j).WPT = 2;
             elseif ismember(traj(j).column, '6')
-                traj(j).doseints = [3,3]
+                traj(j).doseints = [3,3];
                 traj(j).WPT = 3;
             elseif ismember(traj(j).column, '7')
-                traj(j).doseints = [3,2]
+                traj(j).doseints = [3,2];
                 traj(j).WPT = 2;
             elseif ismember(traj(j).column, '8')
-                traj(j).doseints = [2,3]
+                traj(j).doseints = [2,3];
                 traj(j).WPT = 3;
             elseif ismember(traj(j).column, '9')
-                traj(j).doseints = [2,2]
+                traj(j).doseints = [2,2];
                 traj(j).WPT = 2;
             elseif ismember(traj(j).column, '10')
-                traj(j).doseints = [2,1]
+                traj(j).doseints = [2,1];
                 traj(j).WPT = 4;
             elseif ismember(traj(j).column, '11')
                 traj(j).dosenum = 1;
@@ -178,7 +180,7 @@ for i = 1:length(raw) %each data set runs
                 traj(j).dose = 0;
             end
         elseif i == 4 %GH1832 3rd dose varying dosage
-            traj(j).date = '12-18-18'
+            traj(j).date = '12-18-18';
             traj(j).tdose = 69;
             traj(j).seed = 2000;
             traj(j).dosenum = 3;
@@ -219,7 +221,7 @@ for i = 1:length(raw) %each data set runs
                 traj(j).dosenum = 3;
                 traj(j).numdoses = 3;
                 traj(j).WPT = 4;
-                traj(j).prevdose = [75,100]
+                traj(j).prevdose = [75,100];
                 traj(j).doseints = [6,4];
             elseif ismember(traj(j).column, '3')
                 traj(j).dosenum = 3;
@@ -350,7 +352,7 @@ for i = 1:length(raw) %each data set runs
             end
         elseif i == 9 %GH1815: 2nd dose varying initial dosage
             traj(j).date = '7-12-18';
-            traj(j).tdose = 76.55
+            traj(j).tdose = 76.55;
             traj(j).seed = 2000;
             traj(j).numdoses = 2;
             traj(j).dosenum = 2;
@@ -486,7 +488,69 @@ for i = 1:length(raw) %each data set runs
                 traj(j).dose = 10;
             elseif ismember(traj(j).column, '11')   
                 traj(j).dose = 0;
-            end    
+            end
+            elseif i == 13 %GH1827 third dose varying dosage
+            traj(j).celltype = 'BT474';
+            traj(j).date = '11-28-18';
+            traj(j).tdose = 63.25;
+            traj(j).seed = 4000;
+            traj(j).dosenum = 3;
+            traj(j).prevdose = [35,35];
+            traj(j).WPT = 2;
+            traj(j).numdoses = 3;
+            traj(j).doseints = [2,2];
+            if ismember(traj(j).column, '2')
+                traj(j).dose = 120;
+            elseif ismember(traj(j).column, '3')
+                traj(j).dose = 60;
+            elseif ismember(traj(j).column, '4')
+                traj(j).dose = 55;
+            elseif ismember(traj(j).column, '5')
+                traj(j).dose = 50;
+            elseif ismember(traj(j).column, '6')
+                traj(j).dose = 42.5;
+            elseif ismember(traj(j).column, '7')
+                traj(j).dose = 35;
+            elseif ismember(traj(j).column, '8')
+                traj(j).dose = 27.5;
+            elseif ismember(traj(j).column, '9')
+                traj(j).dose = 20;
+            elseif ismember(traj(j).column, '10')
+                traj(j).dose = 10;
+            elseif ismember(traj(j).column, '11')   
+                traj(j).dose = 0;
+            end
+            elseif i == 14 %GH1828 second dose varying dosage
+            traj(j).celltype = 'BT474';                
+            traj(j).date = '11-28-18';
+            traj(j).tdose = 63.25;
+            traj(j).seed = 3000;
+            traj(j).dosenum = 2;
+            traj(j).prevdose = 35;
+            traj(j).WPT = 4;
+            traj(j).numdoses = 2;
+            traj(j).doseints = 4;
+            if ismember(traj(j).column, '2')
+                traj(j).dose = 120;
+            elseif ismember(traj(j).column, '3')
+                traj(j).dose = 60;
+            elseif ismember(traj(j).column, '4')
+                traj(j).dose = 55;
+            elseif ismember(traj(j).column, '5')
+                traj(j).dose = 50;
+            elseif ismember(traj(j).column, '6')
+                traj(j).dose = 42.5;
+            elseif ismember(traj(j).column, '7')
+                traj(j).dose = 35;
+            elseif ismember(traj(j).column, '8')
+                traj(j).dose = 27.5;
+            elseif ismember(traj(j).column, '9')
+                traj(j).dose = 20;
+            elseif ismember(traj(j).column, '10')
+                traj(j).dose = 10;
+            elseif ismember(traj(j).column, '11')   
+                traj(j).dose = 0;
+            end
         end            
         traj(j).accdose = traj(j).dose + sum(traj(j).prevdose);
     end
