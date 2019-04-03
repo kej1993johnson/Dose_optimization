@@ -1,21 +1,31 @@
-function [Y] = simmodelgreene(pfit,ytimefit, N0s, pset, Uvec, lengthvec)
+function [Y] = simmodelgreene(pfit,ytimefit, N0s, pset, Uvec, lengthvec, pfID, psetID)
 % SIMMODELGreene returns Y values corresponding to times T for parameter vector p
 % for James Greene model
 % THE MODEL:
 % dS/dt = rs(1-(S+R)/K)*S - alpha*u(t)*S - ds*u(t)*S
 % dR/dt = rr(1-(S+R)/K)*R + alpha*u(t)*S- dr*u(t)*R ;
 % 
-%pset = [S0, R0, rs, carcap];
-%pfit = [ alpha, rr, ds, dr];
-
-% define inputs
-P = num2cell(pfit); 
-[alpha, rr, ds] = deal(P{:}); % our parameters
-
-P2 = num2cell(pset);
-[rs, carcap, props, dr] = deal(P2{:});
-
-
+% Define inputs
+phi = 0;
+rs = 0;
+carcap = 0;
+alpha = 0;
+rr = 0;
+ds = 0;
+dr = 0;
+params = [phi, rs, carcap, alpha, rr, ds, dr];
+for i = 1:length(params)
+    indset= find(ismember(psetID, i));
+    if ~isempty(indset)
+    params(i) = pset(indset);
+    end
+    indfit = find(ismember(pfID,i));
+    if ~isempty(indfit)
+    params(i) = pfit(indfit);
+    end
+end
+P = num2cell(params);
+[phi, rs, carcap, alpha, rr, ds, dr] = deal(P{:});
 
 
 Nsr = [];
@@ -28,8 +38,8 @@ ist = vertcat(1,cumsum(lengthvec(1:end-1,2))+1);
 ie = cumsum(lengthvec(:,2));
 
 for i = 1:size(lengthvec,1)
-    S0 = props*N0s(i);
-    R0 = (1-props)*N0s(i);
+    S0 = phi*N0s(i);
+    R0 = (1-phi)*N0s(i);
     % vary these based on what we're fitting
   
     p = [ S0, R0, rs, carcap, alpha, rr, ds, dr];

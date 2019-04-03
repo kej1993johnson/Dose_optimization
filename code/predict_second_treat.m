@@ -77,9 +77,9 @@ legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 figure;
-plot(tvec, sensfrac_t,'g', 'LineWidth',2)
+plot(tvec, sensfrac_t,'g', 'LineWidth',3)
 hold on
-plot(tvec, resfrac_t, 'r','LineWidth',2)
+plot(tvec, resfrac_t, 'r','LineWidth',3)
 text(tvec(end-100), sensfrac_t(end-100), ['\phi_{sens_t=8WPT}=', num2str(fracSens)], 'FontSize', 14)
 text(tvec(end-100), resfrac_t(end-100), ['\phi_{res_t=8WPT}=', num2str(1-fracSens)], 'FontSize', 14)
 plot(tvec(end-100), sensfrac_t(end-100), 'k*', 'LineWidth',5)
@@ -156,23 +156,3 @@ subplot(2, length(traj2)/2, i)
     
 end
         
-%%
-
-figure;
-plot(tvec2,N,'LineWidth',3, 'color','b');
-hold on
-plot(tvec2, S, 'LineWidth', 3,'color', 'g');
-plot(tvec2, R, 'LineWidth', 3, 'color', 'r');
-if traj(i).dosenum ==2 && traj(i).WPT ==3 && traj(i).dose == 75 && traj(i).prevdose == 75 
-    plot(traj(i).tfit, traj(i).Nfit, '*') 
-    hold on
-end
-legend('N(t)', 'S(t)', 'R(t)', 'data', 'Location', 'NorthWest')
-legend boxoff
-xlim([ 0 tvec2(end)])
-xlabel('Time (hours)','FontSize',20)
-ylabel('Total Cell Number','FontSize',20)
-title('Predicted vs. actual response to second treatment at 3 weeks')
-set(gca,'FontSize',20,'LineWidth',1.5)
-
-

@@ -16,9 +16,7 @@ ind(i) = all(matches, 'all');
 end
 trajM = traj(ind);
 traj = trajM;
-
-
-%% Separate by dose
+% Separate by dose
 uniqdose = [];
 doselist = [];
 for i = 1:length(traj)
@@ -29,20 +27,18 @@ for i = 1:length(traj)
     end
 end
 uniqdose= unique(doselist);
-%% Make a new structure which combines each dox concentration
+% Make a new structure which combines each dox concentration
     % percapita growth rate 
     % variance of per capita growth rate
  
  % find groups by N0
-
- 
  for i = 1:length(uniqdose)
     trajsum(i).Cdox = [];
     trajsum(i).Nmat = [];
     trajsum(i).nreps = 0;
     trajsum(i).tmat = [];
  end
-%%
+
  for i = 1:length(uniqdose) % number of unique seed numbers
     for j = 1:length(traj)
         date = {'8-16-18'}; % pull from the same experiment: first treat
@@ -58,8 +54,7 @@ uniqdose= unique(doselist);
         end
     end
  end
- 
- %% Plot the raw data
+% Plot the raw data
  for i = 1:length(trajsum)
      for j = 1: trajsum(i).nreps
          plot(trajsum(i).tmat(:,j), trajsum(i).Nmat(:,j), 'color', trajsum(i).color)
@@ -69,8 +64,7 @@ uniqdose= unique(doselist);
  xlabel('time (hours)')
  ylabel('N(t)')
  title('N(t) for different single pulse treatments')
- %% Again, clean data for fitting...
-
+ % Again, clean data for fitting...
  for i = 1:length(trajsum)
     if i ==1
     Nfin = 5.5e4;
@@ -196,100 +190,38 @@ plot(trajsum(1).tvec, trajsum(1).Nmean, 'r*')
 xlabel('time (hours)')
 ylabel('Model predicted response to pulse treat')
 title('Test ability to generate model trajectories')
-%% Bayesian fit for gs & K using untreated control
-
-% The simplified  model looks like this
-%
-% $$ N(t) = N0*K*(1/(N0 + (K-N0)exp(-gst));
-% 
-% where:
-%
-% * $N_0$ is the initial cell number
-% * gs is the sensitive cell growth rate 
-% * K is the carrying capacity
-
-
-% Define transforms 
-% single exponential
-pfxform1 = @(pval)[1 1].*log(pval); %'forward' parameter transform into Reals
-pbxform1 = @(phat)[1 1].*exp(phat);  %'backward' parameter transform into model space
-yfxform = @(y)log(y); % 'forward' transform for data and model output
-ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
-
-
-
-sigma = trajsum(1).Nstd(2:end);
-
+%% Fit untreated control data by calling separate function 
+% grab untreated data
+sigma = trajsum(1).Nstd(1:end);
 ydataf = trajsum(1).Nmean;
-N0 = ydataf(1);
-ydata = ydataf(2:end);
 ytimef = trajsum(1).tvec;
-ytime = ytimef(2:end);
-
-% Set up forward models, fit all three nested versions of model
-modelfun1 = @(p)simmodel1(p, ytime, N0); % single exponential model with carrying capacity  
 
 
-    % INITIAL GUESSES BASED ON DATA
-
-    gguess = (yfxform(ydata(end))-yfxform(ydata(end-5)))/(ytime(end)-ytime(end-5)); 
-    % alter initial guesses to prevent NaNs and zeros
-    Kguess = ydata(end);
-    if isnan(gguess)
-        gguess = 1e-5;
-    end
-    if isinf(gguess)
-        gguess = 0.8;
-    end
-    if gguess <= 0
-        gguess = 1e-5;
-    end
-    
-    % Initial guess matrices
-    theta1 = [gguess, Kguess]; % and k
-
-    
-    % Write log likelihood function based on assumption of normally
-    % distributed sampling error
-    
-    % Goal: maximize the probability of the data given the model. Normpdf
-    % will output a probability of the data (x- 1st argument), given the
-    % mean(expectation, here the model), and the variance, at each time point. 
-    % take the log and minimize the NLL to maximize likeihood of data given
-    % the model
-    
-    % single exponential with carrying capacity
-    loglikelihood1 = @(phat)sum(log(normpdf(yfxform(ydata),yfxform(modelfun1(pbxform1(phat))), sigma)));
-    % single exponential with growth
-   
-    % Write objective functions for each model
-    objfun1 = @(phat)-loglikelihood1(phat); 
-    phatbest1 = fminsearch(objfun1, pfxform1(theta1));
-    
-    pi = pbxform1(phatbest1);
-    gs = pi(1);
-    carcap = pi(2); 
-    singexpmodel = simmodel1(pbxform1(phatbest1), ytime, N0);
-    
+% Run through fitting function, get parameters (gs & carcap) and simulated
+% forward model
+[punt, singexpmodel] = fit_untreated(ydataf,ytimef, sigma);
+rs = punt(1);
+carcap = punt(2);
     figure;
-    plot(ytime, ydata, '*', 'LineWidth', 3)
+    plot(ytimef, ydataf, '*', 'LineWidth', 3)
     hold on
-    plot(ytime, singexpmodel,'-', 'LineWidth', 3')
-    plot(ytime, ydata + 1.96*sigma, 'b-')
-    plot(ytime, ydata - 1.96*sigma, 'b-')
+    plot(ytimef, singexpmodel,'-', 'LineWidth', 3')
+    plot(ytimef, ydataf + 1.96*sigma, 'b-')
+    plot(ytimef, ydataf - 1.96*sigma, 'b-')
     xlabel ('time (hours)')
     ylabel(' N(t)')
-    legend ('Untreated control data', 'model fit', 'Location', 'NorthWest')
+    legend ('Untreated control data', 'model fit', '95% CI on data', 'Location', 'NorthWest')
     legend box off
     title ('Fit for g_{s} & K using untreated control')
     set(gca,'FontSize',20,'LineWidth',1.5)
- %% Now use this and fit for gr, ds, and alpha from single pulse treatments
-rs = gs;
-dr = 0;
-carcap = carcap;
-props = 1;%0.8;
-pset = [rs, carcap, props, dr];
 
+ %% Now use this and fit for gr, ds, and alpha from single pulse treatments
+
+dr = 0;
+phi = 1;
+pset = [phi, rs, carcap, dr];
+%params = [phi, rs, carcap, alpha, rr, ds, dr];
+psetID = [1, 2, 3, 7];
 
 %% Bayesian fit for alpha, rr, and ds using all treatments
 
@@ -300,17 +232,6 @@ pset = [rs, carcap, props, dr];
 % dR/dt = rr(1-(S+R)/K)*R + alpha*u(t)*S- dr*u(t)*R ;
 % 
 % We will fit N= S +R trajectories for doses 10, 20, 35, 50, & 75
-% Fit for alpha, rr, & ds
-
-
-% Define transforms 
-% for 3 variables
-pfxform = @(pval)[1 1 1].*log(pval); %'forward' parameter transform into Reals
-pbxform = @(phat)[1 1 1].*exp(phat);  %'backward' parameter transform into model space
-yfxform = @(y)log(y); % 'forward' transform for data and model output
-ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
-
-
 % Make vectors of inputs from 2:6 of traj sum corresponding to doses desired to
 % fit
 sigmafit = [];
@@ -321,60 +242,58 @@ lengtht = [];
 lengthU = [];
 Uvec = [];
 
-% fit on doses 10, 20, 35, & 50 nM dox
-for i = 2:5%length(trajsum)
-sigmafit = vertcat(sigmafit,trajsum(i).Nstd(2:end));
-ydatafit = vertcat(ydatafit, trajsum(i).Nmean(2:end));
-ytimefit = vertcat(ytimefit, trajsum(i).tvec(2:end));
+% fit on doses 10, 20, 35, 50 & 75 nM dox
+% Grab the stdev, ydata, initial cell number, and U from the traj data
+% structure 
+for i = 2:6%length(trajsum)
+sigmafit = vertcat(sigmafit,trajsum(i).Nstd(1:end));
+ydatafit = vertcat(ydatafit, trajsum(i).Nmean(1:end));
+ytimefit = vertcat(ytimefit, trajsum(i).tvec(1:end));
 N0s = vertcat(N0s,trajsum(i).Nmean(1));
-lengtht = vertcat(lengtht, length(trajsum(i).Nmean)-1);
+lengtht = vertcat(lengtht, length(trajsum(i).Nmean));
 lengthU = vertcat(lengthU, length(trajsum(i).U));
 Uvec = vertcat(Uvec, trajsum(i).U');
 end
 lengthvec = horzcat(lengtht, lengthU);
 
+% Declare the parameters to be fit and give them an initial guess
 
-% Set up forward models, fit all three nested versions of model
-
-modelfun = @(p)simmodelgreene(p, ytimefit, N0s, pset, Uvec, lengthvec); % single exponential model with death  
-
-
-
-
-%% INITIAL GUESSES FOR alpha, rr & ds
-
-alphaguess =  1e-7;
+pfID = [ 4, 5, 6];
+alphaguess =  1e-3;
 rrguess = 0.015;
-dsguess = 1e-3;
+dsguess = 5e-3;
+pfitguess = [alphaguess, rrguess, dsguess]; 
 
-    % Initial guess vector
-    theta = [alphaguess, rrguess, dsguess]; 
+%test out the initial guess parameters 
+modelfun = @(p)simmodelgreene(p, ytimefit, N0s, pset, Uvec, lengthvec, pfID, psetID); % single exponential model with death  
 
-    
-    % Write log likelihood function based on assumption of normally
-    % distributed sampling error
-    
-    % Goal: maximize the probability of the data given the model. Normpdf
-    % will output a probability of the data (x- 1st argument), given the
-    % mean(expectation, here the model), and the variance, at each time point. 
-    % take the log and minimize the NLL to maximize likeihood of data given
-    % the model
-    
-    % Greene model
-    loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxform(phat))), sigmafit)));
-  
-   
-    % Write objective functions for each model
-    objfun = @(phat)-loglikelihood(phat); 
-    phatbest = fminsearch(objfun, pfxform(theta));
-    
-    pbest = pbxform(phatbest);
 
-    Greenemodel = modelfun(pbest);
+% Test out your forward function
+figure;
+plot(ytimefit, modelfun(pfitguess), 'r.','LineWidth', 2)
+hold on
+plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
+plot(ytimefit, ydatafit + 1.96*sigmafit, 'g.')
+plot(ytimefit, ydatafit - 1.96*sigmafit, 'g.')
+xlabel ('time (hours)')
+ylabel(' N(t)')
+legend ('first guess', 'datat')
+legend box off
+title ('Fit for \alpha, rr and ds')
+
+
+%% Try to run your fitting function
+
+[pbestf,N_model] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s);
+alpha = pbestf(1);  
+rr = pbestf(2);
+ds = pbestf(3);
+
+
     figure;
     plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
     hold on
-    plot(ytimefit, Greenemodel,'r*', 'LineWidth', 3')
+    plot(ytimefit, N_model,'r*', 'LineWidth', 3')
     plot(ytimefit, ydatafit + 1.96*sigmafit, 'g.')
     plot(ytimefit, ydatafit - 1.96*sigmafit, 'g.')
     xlabel ('time (hours)')
@@ -384,12 +303,11 @@ dsguess = 1e-3;
     title ('Fit for \alpha, rr and ds')
     set(gca,'FontSize',20,'LineWidth',1.5)
 %% Plot calibrated data
-P = num2cell(pbest); 
-[alpha, rr, ds] = deal(P{:}); % our parameters
-
-p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
+N0 = 2e3;
+tdrug = 1;
+p= [phi*N0, (1-phi)*N0, rs, carcap, alpha, rr, ds, dr];
  figure;
- for i = 2:5%length(trajsum)
+ for i = 2:6%length(trajsum)
      subplot(2,1,1)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
@@ -398,15 +316,15 @@ p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
        
          xlabel('time (hours)')
         ylabel('N(t)')
-        title('Model calibration to pulsed treatments 10-50 nM')
+        title('Model calibration to pulsed treatments 10-75 nM')
         dt = 1;
         tvec = [];
         Nsri = [];
         tvec = trajsum(i).tvec;
         U = trajsum(i).U;
          pi = p;
-         pi(1) = props*trajsum(i).Nmean(1);
-         pi(2) = (1-props)*trajsum(i).Nmean(1);
+         pi(1) = phi*trajsum(i).Nmean(1);
+         pi(2) = (1-phi)*trajsum(i).Nmean(1);
         [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
         plot(tvec, Nsri(:,1), 'color','r', 'LineWidth',2)
         %plot(tcrit, Ncrit, '*', 'LineWidth',2)
@@ -415,8 +333,6 @@ p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
         set(gca,'FontSize',20,'LineWidth',1.5)
         trajsum(i).Nmod1pulse = Nsri;
 
-
-
         subplot(2,1,2)
        ttest = [];
        ttest = 0:dt:trajsum(i).tvec(end);
@@ -427,56 +343,11 @@ p= [props*N0, (1-props)*N0, rs, carcap, alpha, rr, ds, dr];
         title('Effective dose of each pulse treatment')
         set(gca,'FontSize',20,'LineWidth',1.5)
  end
- %% Save calibrated parameters from MCF-7s with 4 doses 10-50 nM
+ %% Save calibrated parameters from MCF-7s with 4 doses 10-75 nM
  
 p4fit= [rs, carcap, alpha, rr, ds, dr];
 save('../out/p4fit', 'p4fit')
- 
- %% Prediction of new doses
-
- figure;
- for i = 6%:length(trajsum)
-     subplot(2,1,1)
-         plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
-         hold on
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
-       
-         xlabel('time (hours)')
-        ylabel('N(t)')
-        title('Model prediction for pulsed treatments 75 nM')
-        dt = 1;
-        tvec = [];
-        Nsri = [];
-        tvec = trajsum(i).tvec;
-        U = trajsum(i).U;
-         pi = p;
-         pi(1) = props*trajsum(i).Nmean(1);
-         pi(2) = (1-props)*trajsum(i).Nmean(1);
-        [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
-        plot(tvec, Nsri(:,1), 'color','b', 'LineWidth',2)
-         plot(tvec, Nsri(:,2), 'color','g', 'LineWidth',2)
-         plot(tvec, Nsri(:,3), 'color','r', 'LineWidth',2)
-        %plot(tcrit, Ncrit, '*', 'LineWidth',2)
-        %text(tcrit +5, Ncrit + 5, ['t_{crit}=', num2str(tcrit),' hours'])
-        text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
-        set(gca,'FontSize',20,'LineWidth',1.5)
-        trajsum(i).Nmod1pulse = Nsri;
-
-
-
-        subplot(2,1,2)
-       ttest = [];
-       ttest = 0:dt:trajsum(i).tvec(end);
-       plot(ttest, trajsum(i).U,'.', 'color',trajsum(i).color, 'LineWidth',1)
-        hold on
-        xlabel('time (hours)')
-        ylabel('Effective dose U(t)')
-        title('Effective dose of each pulse treatment')
-        set(gca,'FontSize',20,'LineWidth',1.5)
- end
-%% Save trajsum
-
+% Save trajsum
 %p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
 for i = 1:length(trajsum)
     pi = p;
