@@ -283,13 +283,17 @@ title ('Fit for \alpha, rr and ds')
 
 
 %% Try to run your fitting function
-
-[pbestf,N_model] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s);
+pbounds = [0, 1; 0, 1; 0,1];
+%[pbestf,N_model, negLL, pbestGD, N_modelGD, negLLGD]
+[pbestf,N_model, negLL] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s, pbounds);
+CCC = corrcoef(N_model,ydatafit);
 alpha = pbestf(1);  
 rr = pbestf(2);
 ds = pbestf(3);
-
-
+%%
+chi_sq = sum(((N_model-ydatafit)./sigmafit).^2)
+chi_sqGD = sum(((N_modelGD-ydatafit)./sigmafit).^2)
+    
     figure;
     plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
     hold on
