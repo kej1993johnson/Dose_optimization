@@ -200,7 +200,7 @@ ytimef = trajsum(1).tvec;
 % Run through fitting function, get parameters (gs & carcap) and simulated
 % forward model
 [punt, singexpmodel] = fit_untreated(ydataf,ytimef, sigma);
-rs = punt(1);
+gtot = punt(1);
 carcap = punt(2);
     figure;
     plot(ytimef, ydataf, '*', 'LineWidth', 3)
@@ -212,16 +212,26 @@ carcap = punt(2);
     ylabel(' N(t)')
     legend ('Untreated control data', 'model fit', '95% CI on data', 'Location', 'NorthWest')
     legend box off
-    title ('Fit for g_{s} & K using untreated control')
+    title ('Fit for g_{tot} & K using untreated control')
     set(gca,'FontSize',20,'LineWidth',1.5)
+%% Use gtot to guess gs and gr from Sui Huang's paper
+% We have the expression for gtot at equilibrium. If we assume that prior
+% to treat, phenotypic equilibrium occurs (i.e. phi is constant), then we
+% have:
+% gtot = (gs*rstar + gr)/(rstar+1)
+% solve for the expected relationship between gs and gr in terms of gtot &
+% rstar. rstar = S/R whereas phi0 = S/N
 
+dr = 0;
+phi0 = 0.8;
+rstar= phi0/(1-phi0);
  %% Now use this and fit for gr, ds, and alpha from single pulse treatments
 
 dr = 0;
-phi = 1;
-pset = [phi, rs, carcap, dr];
+phi0 = 0.8;
+pset = [phi0, carcap, dr];
 %params = [phi, rs, carcap, alpha, rr, ds, dr];
-psetID = [1, 2, 3, 7];
+psetID = [1, 3, 7];
 
 %% Bayesian fit for alpha, rr, and ds using all treatments
 
@@ -258,11 +268,13 @@ lengthvec = horzcat(lengtht, lengthU);
 
 % Declare the parameters to be fit and give them an initial guess
 
-pfID = [ 4, 5, 6];
+pfID = [ 2, 4, 5, 6];
+
 alphaguess =  1e-3;
-rrguess = 0.015;
+rrguess = 1e-7;
+rsguess = ((rstar+1)*gtot - rrguess)./rstar; % expression that relates gs, gr, and gtot
 dsguess = 5e-3;
-pfitguess = [alphaguess, rrguess, dsguess]; 
+pfitguess = [rsguess, alphaguess, rrguess, dsguess]; 
 
 %test out the initial guess parameters 
 modelfun = @(p)simmodelgreene(p, ytimefit, N0s, pset, Uvec, lengthvec, pfID, psetID); % single exponential model with death  
@@ -283,13 +295,18 @@ title ('Fit for \alpha, rr and ds')
 
 
 %% Try to run your fitting function
-
-[pbestf,N_model] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s);
-alpha = pbestf(1);  
-rr = pbestf(2);
-ds = pbestf(3);
-
-
+pbounds = [0,1; 0, 1; 0, 1; 0,1];
+%[pbestf,N_model, negLL, pbestGD, N_modelGD, negLLGD]
+[pbestf,N_model, negLL] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s, pbounds);
+CCC = corrcoef(N_model,ydatafit);
+rs = pbestf(1);
+alpha = pbestf(2);  
+rr = pbestf(3);
+ds = pbestf(4);
+%%
+chi_sq = sum(((N_model-ydatafit)./sigmafit).^2)
+chi_sqGD = sum(((N_modelGD-ydatafit)./sigmafit).^2)
+%%    
     figure;
     plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
     hold on
@@ -305,7 +322,7 @@ ds = pbestf(3);
 %% Plot calibrated data
 N0 = 2e3;
 tdrug = 1;
-p= [phi*N0, (1-phi)*N0, rs, carcap, alpha, rr, ds, dr];
+p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
  figure;
  for i = 2:6%length(trajsum)
      subplot(2,1,1)
@@ -323,8 +340,8 @@ p= [phi*N0, (1-phi)*N0, rs, carcap, alpha, rr, ds, dr];
         tvec = trajsum(i).tvec;
         U = trajsum(i).U;
          pi = p;
-         pi(1) = phi*trajsum(i).Nmean(1);
-         pi(2) = (1-phi)*trajsum(i).Nmean(1);
+         pi(1) = phi0*trajsum(i).Nmean(1);
+         pi(2) = (1-phi0)*trajsum(i).Nmean(1);
         [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
         plot(tvec, Nsri(:,1), 'color','r', 'LineWidth',2)
         %plot(tcrit, Ncrit, '*', 'LineWidth',2)
