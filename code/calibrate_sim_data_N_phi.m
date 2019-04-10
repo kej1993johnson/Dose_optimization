@@ -1,6 +1,11 @@
 % This script tests the calibration method by randomly sampling parameter
-% space, generating in silico data, and running the calibration for 1. N(t)
-% only, 2. N(t) and phi(t) and 3. N(t) and only 3 phi(t) time points.
+% space, generating in silico data, and running the calibration using
+% phi(t) & N(t).
+
+% We will eventually rewrite this script so that it varies the number of
+% phi(t) time points and repeats the calibration, and also varies lambda,
+% the regularization term. 
+ 
 
 
 % It uses the N0s, time vectors, and error in data for weighting from the
@@ -144,6 +149,7 @@ for i = 1:nsamps
     pfitstore(i,:) = [ rs, alpha, rr, ds];
 end
 %% Generate untreated control data
+% Fit this only to N(t) 
 sigmaunt = trajsum(1).Nstd(1:end);
 ytimeunt = trajsum(1).tvec;
 Uunt = trajsum(1).U;
@@ -174,8 +180,9 @@ for i = 1:nsamps
     Nfitunt(:,i) = Nmodunt;
 
 end   
+%%
 figure;
-ind = 1;
+ind = 20;
 plot(ytimeunt, Nstoreunt(:,ind), '*')
 hold on
 plot(ytimeunt, Nfitunt(:,ind), '-')
@@ -189,7 +196,7 @@ legend box off
 title ('Example fit to untreated control simulated data')
 set(gca,'FontSize',20,'LineWidth',1.5)
 %% Generate dosed data and fit it using puntfit
-
+% Here we're going to generate dosed data and output N(t) and phi(t)
 psetID = [1, 3, 7];
 pfitID = [2, 4, 5, 6];
 % Get what we need from real data
@@ -210,7 +217,17 @@ end
 lengthvec = horzcat(lengtht, lengthU);
 
 % Generate the dosed data 
-for i = 1:nsamps
+% Simulate the effect of a very strong pulse treatment on phi(t) and save
+% that output for the longest time vector
+% We are going to pretend we can capture phi(t) for 8 weeks every 4 hours
+% to start
+Cdox = 50;
+tgen = [0:1:1344];
+tbot = [0:4:1344];
+Ub=k*Cdox*exp(-kdrug*(tgen));
+lengthvecphi = [length(tbot), length(tgen)];
+lam = 100;
+for i = 20%1:nsamps
     
     P=num2cell(pallstore(i,:));
     [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
@@ -226,31 +243,69 @@ for i = 1:nsamps
         S0 = phi0*N0;
         R0 = (1-phi0)*N0;
         pit = [S0, R0, rs, carcap, alpha, rr, ds, dr]; 
+        % Generate data for N(t)
         [Nsr, ~, ~] = fwd_Greene_model(pit, tvec, U, dt, tdrug);
-        Nsr = Nsr + normrnd(0, eta,[length(tvec) 3]);
+        Nsrdat = Nsr(:,2:3) + normrnd(0, eta,[length(tvec) 2]);
+        ind0=Nsrdat<0;
+        Nsrdat(ind0)=0;
+        Nsr(:,1) = Nsrdat(:,1) + Nsrdat(:,2);
         Ntrt = vertcat(Ntrt, Nsr(:,1));
-        phitrt = vertcat(phitrt, Nsr(:,2)./Nsr(:,1));
     end
-    Ntrtstore(:,i) = Ntrt;
-    phitrtstore(:,i) = phitrt;
+        % Generate bottlenecked data for phi(t)
+        N0phi = 2e3; % set this because this is what we think we seeded
+        S0 = phi0*N0phi;
+        R0 = (1-phi0)*N0phi;
+        pit2 = [S0, R0, rs, carcap, alpha, rr, ds, dr];
+        [Nb, ~,~]=fwd_Greene_model(pit2, tbot, Ub, dt, tdrug);
+        Nbnoise=Nb; % set it as this then replace it
+        Nbnoise(:,2:3) = Nb(:,2:3) + normrnd(0, lam,[length(tbot) 2]);
+        % remove negative numbers
+        for j =1:length(Nbnoise)
+            if Nbnoise(j,2) <0
+                Nbnoise(j,2)=0;
+            end
+            if Nbnoise(j,3) <0
+                Nbnoise(j,3) =0;
+            end
+        end
+        Nbnoise(:,1) = Nbnoise(:,2) + Nbnoise(:,3);
+        phitrt = Nbnoise(:,2)./Nbnoise(:,1);
+        phismooth = Nb(:,2)./Nb(:,1);
+        % Need a standard deviation vector that accounts for higher
+        % uncertainty at very low phi....
+        phisigfit =0.1*ones(length(tbot),1);
+        % Find an estimate of uncertainty in phitrt
+        % Since we add noise to N data with a standard deviation eta, then the
+        % uncertainty in the data is this noise/ the N data?
+        %phisigfit = *eta./Nb(:,1);
+    % Store the in silico data for that sample
+    Ntrtstore(:,i) = Ntrt; % store N(t) data for that parameter set
+    phitrtstore(:,i) = phitrt; % store phi(t) data for that parameter set
+   
     
-    % Now fit your in silico data
+    % Now fit your in silico data using both Ntrt and phitrt
     % first fit Ntrt
     gtot = puntfit(i,1);
     carcapfit = puntfit(i,2);
     pset = [phi0, carcapfit, dr];
-    rrguess = 1e-3*gtot;
+    rrguess = 1e-2*gtot;
     rstar = phi0/(1-phi0);
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
     theta = [rsguess, 0.0035, rrguess, 0.001];
-    [pbestf,N_model, negLL] = fit_fxn_Greene(Ntrt,sigmafit, pfitID, psetID, theta, pset, ytimefit, Uvec, lengthvec, N0s, pbounds);
-    pfittrt(i,:) = pbestf;
-    Nfittrt(:,i) = N_model;
+    
+    % Give this function both Ntrt and phitrt
+    %[pbestf,N_model, negLL] = fit_fxn_GreeneNphi(Ntrt,sigmafit, phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec, lengthvecphi, N0s, pbounds);
+   % [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi, pbounds);
+                                    
+%     pfittrt(i,:) = pbestf;
+%     Nfittrt(:,i) = N_model;
+%     phifittrt(:,i) = phi_model;
 
 end
 %%
-ind = 45
+ind = 30
 figure;
+subplot(1,2,1)
 plot(ytimefit, Ntrtstore(:,ind), '*', 'LineWidth',2)
 hold on
 plot(ytimefit, Nfittrt(:,ind), 'o', 'LineWidth',3)
@@ -259,30 +314,53 @@ plot(ytimefit, Ntrtstore(:,ind)-1.96*sigmafit, 'k.')
 %text(ytimeunt(20), Nfitunt(20,ind), ['CCC_{Ntrt}=', num2str(CCC_Ntrt(ind)),', CCC_{pfit}=', num2str(CCC_ptrt(ind))])
 xlabel ('time (hours)')
 ylabel(' N(t)')
-legend ('in silico data', 'model fit', '95% CI on data', 'Location', 'NorthWest')
+legend ('in silico data', 'model fit from \phi(t)', '95% CI on data', 'Location', 'NorthWest')
 legend box off
-title ('Example of fit to simulated treated data')
+title ('Example of N(t) callibrated from \phi(t)')
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+subplot(1,2,2)
+plot(tbot, phitrtstore(:,ind), 'g*', 'LineWidth',2)
+hold on
+plot(tbot, phifittrt(:,ind),'o', 'LineWidth',3)
+plot(tbot, phifittrt(:,ind) + 1.96*phisigfit, 'k-')
+plot(tbot, phifittrt(:,ind) - 1.96*phisigfit, 'k-')
+%plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
+xlabel ('time (hours)')
+ylabel(' \phi_{sens}(t)')
+legend ('in silico data', '95% CI on data', 'Location', 'NorthWest')
+legend box off
+title ('Example of \phi_{sens} fit from \phi(t)')
 set(gca,'FontSize',20,'LineWidth',1.5)
 %% Accuracy metrics take two:
 % We want to measure concordance between pgiven and pfti for all nsamps as
 % well as concordance between Ninsilo and Nfit for all nsamps
 nfit = size(pfitstore,2);
 ndata = size(Ntrtstore,1);
+nphi = size(phitrtstore,1);
+
 pgiven = reshape(pfitstore, [nsamps*nfit, 1]);
 pfit = reshape(pfittrt, [nsamps*nfit, 1]);
 Ngiven = reshape(Ntrtstore, [nsamps*ndata, 1]);
 Nfit = reshape(Nfittrt, [nsamps*ndata,1]);
+phigiven = reshape(phitrtstore, [nsamps*nphi,1]);
+phifit = reshape(phifittrt, [nsamps*nphi,1]);
 index = isnan(pfit);
 CCC_p = f_CCC([pgiven(index==0), pfit(index==0)], 0.05)
 ind = isnan(Nfit);
 CCC_N = f_CCC([Ngiven(ind==0), Nfit(ind==0)], 0.05)
+ind = isnan(phifit);
+CCC_phi = f_CCC([phigiven(ind==0), phifit(ind==0)], 0.05)
 xp = linspace(min(pgiven), max(pgiven), length(pgiven));
 yp = xp;
 xn=linspace(min(Ngiven), max(Ngiven), length(Ngiven));
 yn = xn;
+xh=linspace(min(phigiven), max(phigiven), length(phigiven));
+yh = xh;
+
 
 figure;
-subplot(1,2,1)
+subplot(1,3,1)
 plot(xp,yp,'-', 'LineWidth',2)
 hold on
 plot(pgiven, pfit, '.')
@@ -292,7 +370,7 @@ xlabel('Set parameters')
 ylabel('Fit parameters')
 title(['All parameters on N(t), CCC= ', num2str(CCC_p)])
 set(gca,'FontSize',20,'LineWidth',1.5)
-subplot(1,2,2)
+subplot(1,3,2)
 plot(xn,yn,'-', 'LineWidth',2)
 hold on
 plot(Ngiven, Nfit, '.')
@@ -302,6 +380,17 @@ xlabel('In silico N(t)')
 ylabel('Calibrated N(t)')
 title(['N(t) on N(t), CCC= ', num2str(CCC_N)])
 set(gca,'FontSize',20,'LineWidth',1.5)
+subplot(1,3,3)
+plot(xh,yh,'-', 'LineWidth',2)
+hold on
+plot(phigiven, phifit, '.')
+xlim([xh(1) xh(end)])
+ylim([xh(1) xh(end)])
+xlabel('In silico \phi(t)')
+ylabel('Calibrated \phi(t)')
+title(['\phi(t) on \phi(t), CCC= ', num2str(CCC_phi)])
+set(gca,'FontSize',20,'LineWidth',1.5)
+%%
 pnames = {'rs', '\alpha', 'rr', 'ds'};
 % Calculate average percent parameter error
 param_err = 100*abs(pgiven-pfit)./pgiven;

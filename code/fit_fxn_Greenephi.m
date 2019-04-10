@@ -1,5 +1,10 @@
-function [pbest,model_N, negLL] = fit_fxn_Greene(ydatafit, sigmafit, pfID, psetID, pfit, pset, time, Uvec, lengthvec, N0s, pbounds) 
+function [pbest,model_N, model_phi, negLL] = fit_fxn_Greenephi(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD, negLLGD]
+% This function
+
+% Delete this section once remake into a function
+
+
 %Write a fucntion that fits any combination of the paramters in the
 %simplest Greene model with the following parameters:
 %p = [ S0, R0, rs, carcap, alpha, rr, ds, dr];
@@ -39,33 +44,32 @@ nfit = length(pfit);
 pfxform = @(pval)ones(1,nfit).*log(pval); %'forward' parameter transform into Reals
 pbxform = @(phat)ones(1,nfit).*exp(phat);  %'backward' parameter transform into model space
 yfxform = @(y)log(y); % 'forward' transform for data and model output
+yfxformp = @(y)log(y./(1-y));
 ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
+ybxformp = @(yhat) exp(yhat)./(1+exp(yhat));
 
 
 theta = pfit; 
 
 % write a function that takes set parameters and fit parameters, combines
 % them, and runs the model forward for the Uvec and 0s provided
-modelfun = @(p)simmodelgreene(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID); 
+modelfunN = @(p)simmodelgreene(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID); 
+modelfunphi = @ (p)simmodelgreenephi(p, tbot, N0phi, pset, Ub, lengthvecphi, pfID, psetID);
+%
+loglikelihoodphi =@(phat)(sum(log(normpdf(phitrt,modelfunphi(pbxform(phat)), phisigfit))));
+loglikelihoodN = @(phat)(sum(log(normpdf(yfxform(ydatafit),yfxform(modelfunN(pbxform(phat))), sigmafit))));
+objfun = @(phat)-(loglikelihoodphi(phat));
+phatbest = fminsearch(objfun, pfxform(theta));
+pbest = pbxform(phatbest);
 
-loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxform(phat))), sigmafit)));
-  
-   
-    % Write objective functions for each model
-    objfun = @(phat)-loglikelihood(phat); 
-    phatbest = fminsearch(objfun, pfxform(theta));
-    
-    pbest = pbxform(phatbest);
 
-    model_N = modelfun(pbest);
-   
+
+    model_N = modelfunN(pbest);
+    model_phi = modelfunphi(pbest);
    negLL = objfun(phatbest);
    
-%    
-%    
-%  % Also use gradient descent method! And compare results 
-%     % likelihood
-%     
+   % Try gradient descent method for finding phi
+   
 %     tol = 1e-5;
 %     lambda =2;
 %     it_count = 0;
@@ -74,18 +78,18 @@ loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxfor
 %     % sum of your errors, and here is the negative loglikelihood.
 %     max_iters = 2000;
 %     deltap = 1e-8;
-%     spant = length(time);
-%     %Initialize best guess
+%     spant = length(tbot);
+%      %Initialize best guess
 %     negLLbest = objfun(pfxform(theta));
 %     negLLinit = negLLbest;
-%     Ntinit = modelfun(theta);
+%     phiinit = modelfunphi(theta);
 %     pe = theta;
 %     pevec = [];
 %     delvec = [];
-%     weightvec = 1./(sigmafit.^2);
+%     weightvec = 1./(phisigfit.^2);
 %     W =diag(weightvec);
 %     eta = 1e-2; 
-%     
+    
 %     while negLLbest>tol && it_count<max_iters
 %         it_count = it_count +1;
 %         
@@ -133,6 +137,6 @@ loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxfor
 %     end
 %     
 %     pbestGD = pe;
-%     model_NGD = modelfun(pbestGD);
+%     model_hiGD = modelfunphi(pbestGD);
 %     negLLGD = negLLbest;
 end
