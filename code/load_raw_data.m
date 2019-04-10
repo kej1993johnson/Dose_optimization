@@ -18,6 +18,9 @@ close all; clear all;
 [raw(12).N, raw(12).T] =xlsread('../data/GH1903_MCF7_PredModel_5th_Dose_4_Week_Intervals_v1.xls');
 [raw(13).N, raw(13).T] =xlsread('../data/GH1827_BT474_PredModel_3rd_Dose_2_Week_Int_v1.xls');
 [raw(14).N, raw(14).T] =xlsread('../data/GH1828_BT474_PredModel_2nd_Dose_4_WPT1_v1.xls');
+[raw(15).N, raw(15).T] =xlsread('../data/GH1825_BT474_PredModel_1st_Dose_0-150_nM_v1.xls');
+[raw(16).N, raw(16).T] =xlsread('../data/GH1826_BT474_PredModel_2nd_Dose_2_Week_Int_v1.xls');
+
 % this reads in the numeric values in an excel sheet (N1), and the text
 % values (T1)
 % Make a "size" matrix that keeps track of the number of wells and time
@@ -25,6 +28,8 @@ close all; clear all;
 % once more data sets are loaded in
 % 1st column in number of time points, 2nd column number of wells in that
 % data set, third column is cumulative number of wells
+
+sz = zeros(length(raw),3);
 for i = 1:length(raw)
     sz(i,1:2) = size(raw(i).N);
     sz(i,2) = sz(i,2) - 1;
@@ -551,10 +556,76 @@ for i = 1:length(raw) %each data set runs
             elseif ismember(traj(j).column, '11')   
                 traj(j).dose = 0;
             end
-        end            
+            elseif i == 15 %GH1825 first dose varying dosage
+            traj(j).celltype = 'BT474';
+            traj(j).date = '10-28-18';
+            traj(j).tdose = 78.25;
+            traj(j).seed = 2000;
+            traj(j).dosenum = 1;
+            traj(j).prevdose = [];
+            traj(j).WPT = [];
+            traj(j).numdoses = 1;
+            traj(j).doseints = [];
+            if ismember(traj(j).column, '2')
+                traj(j).dose = 120;
+            elseif ismember(traj(j).column, '3')
+                traj(j).dose = 60;
+            elseif ismember(traj(j).column, '4')
+                traj(j).dose = 50;
+            elseif ismember(traj(j).column, '5')
+                traj(j).dose = 42.5;
+            elseif ismember(traj(j).column, '6')
+                traj(j).dose = 35;
+            elseif ismember(traj(j).column, '7')
+                traj(j).dose = 27.5;
+            elseif ismember(traj(j).column, '8')
+                traj(j).dose = 20;
+            elseif ismember(traj(j).column, '9')
+                traj(j).dose = 15;
+            elseif ismember(traj(j).column, '10')
+                traj(j).dose = 10;
+            elseif ismember(traj(j).column, '11')   
+                traj(j).dose = 0;
+            end
+            elseif i == 16 %GH1826 second dose varying dosage
+            traj(j).celltype = 'BT474';                
+            traj(j).date = '11-14-18';
+            traj(j).tdose = 72;
+            traj(j).seed = 4000;
+            traj(j).dosenum = 2;
+            traj(j).prevdose = 35;
+            traj(j).WPT = 2;
+            traj(j).numdoses = 2;
+            traj(j).doseints = 2;
+            if ismember(traj(j).column, '2')
+                traj(j).dose = 120;
+            elseif ismember(traj(j).column, '3')
+                traj(j).dose = 60;
+            elseif ismember(traj(j).column, '4')
+                traj(j).dose = 55;
+            elseif ismember(traj(j).column, '5')
+                traj(j).dose = 50;
+            elseif ismember(traj(j).column, '6')
+                traj(j).dose = 42.5;
+            elseif ismember(traj(j).column, '7')
+                traj(j).dose = 35;
+            elseif ismember(traj(j).column, '8')
+                traj(j).dose = 27.5;
+            elseif ismember(traj(j).column, '9')
+                traj(j).dose = 20;
+            elseif ismember(traj(j).column, '10')
+                traj(j).dose = 10;
+            elseif ismember(traj(j).column, '11')   
+                traj(j).dose = 0;
+            end            
+        end
         traj(j).accdose = traj(j).dose + sum(traj(j).prevdose);
     end
 end
+%% random sorting stuff
+T = struct2table(traj); % converts traj to a table
+sortedT = sortrows(T, 'N0true'); % sort the table by '(field)'
+% check "sortedT"
 %% Add color by WPT 
 for j = 1:length(traj)
     if ~isempty(traj(j).WPT)
