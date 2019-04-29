@@ -127,9 +127,9 @@ pbounds = [0,1; 0, 1; 0, 1; 0,1];
 phidom =linspace(0.7,1,100);
 rsdom = linspace(0.001, 0.1, 100);
 carcapdom = linspace(4.8e4, 5.5e4, 100);
-alphadom = linspace(0, 0.01, 100);
-rrdom = linspace(0, 0.001, 100);
-dsdom = linspace(0,0.01, 100);
+alphadom = linspace(1e-10, 0.01, 100);
+rrdom = linspace(1e-10, 0.001, 100);
+dsdom = linspace(1e-10,0.01, 100);
 
 for i = 1:nsamps
     phi0=randsample(phidom,1);
@@ -227,7 +227,7 @@ tbot = [0:4:1344];
 Ub=k*Cdox*exp(-kdrug*(tgen));
 lengthvecphi = [length(tbot), length(tgen)];
 lam = 100;
-for i = 20%1:nsamps
+for i = 1:nsamps
     
     P=num2cell(pallstore(i,:));
     [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
@@ -293,17 +293,23 @@ for i = 20%1:nsamps
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
     theta = [rsguess, 0.0035, rrguess, 0.001];
     
-    % Give this function both Ntrt and phitrt
-    %[pbestf,N_model, negLL] = fit_fxn_GreeneNphi(Ntrt,sigmafit, phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec, lengthvecphi, N0s, pbounds);
-   % [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi, pbounds);
+    %Give this function both Ntrt and phitrt
+    % can toggle the amount that we weigh each portion..
+    % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
+    lambda = 0.5;
+ 
+   [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
                                     
-%     pfittrt(i,:) = pbestf;
-%     Nfittrt(:,i) = N_model;
-%     phifittrt(:,i) = phi_model;
-
+    pfittrt(i,:) = pbestf;
+    Nfittrt(:,i) = N_model;
+    phifittrt(:,i) = phi_model;
+    CCC_vec(i,1) = f_CCC([N_model, Ntrt], 0.05);
+    CCC_vec(i,2) = f_CCC([phi_model, phitrt], 0.05);
+    CCC_vec(i,3)=f_CCC([pfset', pbestf'], 0.05);
 end
 %%
-ind = 30
+for i =28
+    ind = i;
 figure;
 subplot(1,2,1)
 plot(ytimefit, Ntrtstore(:,ind), '*', 'LineWidth',2)
@@ -316,7 +322,7 @@ xlabel ('time (hours)')
 ylabel(' N(t)')
 legend ('in silico data', 'model fit from \phi(t)', '95% CI on data', 'Location', 'NorthWest')
 legend box off
-title ('Example of N(t) callibrated from \phi(t)')
+title (['N(t), CCC_{N}=', num2str(CCC_vec(ind,1)), ', CCC_{p}=', num2str(CCC_vec(ind,3))])
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
@@ -330,8 +336,10 @@ xlabel ('time (hours)')
 ylabel(' \phi_{sens}(t)')
 legend ('in silico data', '95% CI on data', 'Location', 'NorthWest')
 legend box off
-title ('Example of \phi_{sens} fit from \phi(t)')
+title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(ind,2)), ', CCC_{p}=', num2str(CCC_vec(ind,3))])
 set(gca,'FontSize',20,'LineWidth',1.5)
+%pause
+end
 %% Accuracy metrics take two:
 % We want to measure concordance between pgiven and pfti for all nsamps as
 % well as concordance between Ninsilo and Nfit for all nsamps
@@ -350,7 +358,9 @@ CCC_p = f_CCC([pgiven(index==0), pfit(index==0)], 0.05)
 ind = isnan(Nfit);
 CCC_N = f_CCC([Ngiven(ind==0), Nfit(ind==0)], 0.05)
 ind = isnan(phifit);
-CCC_phi = f_CCC([phigiven(ind==0), phifit(ind==0)], 0.05)
+ind2 = isnan(phigiven);
+indall = or(ind,ind2);
+CCC_phi = f_CCC([phigiven(indall==0), phifit(indall==0)], 0.05)
 xp = linspace(min(pgiven), max(pgiven), length(pgiven));
 yp = xp;
 xn=linspace(min(Ngiven), max(Ngiven), length(Ngiven));
@@ -368,7 +378,7 @@ xlim([xp(1) xp(end)])
 ylim([xp(1) xp(end)])
 xlabel('Set parameters')
 ylabel('Fit parameters')
-title(['All parameters on N(t), CCC= ', num2str(CCC_p)])
+title(['All parameters on N(t) & \phi(t), CCC= ', num2str(CCC_p)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 subplot(1,3,2)
 plot(xn,yn,'-', 'LineWidth',2)
@@ -377,8 +387,8 @@ plot(Ngiven, Nfit, '.')
 xlim([xn(1) xn(end)])
 ylim([xn(1) xn(end)])
 xlabel('In silico N(t)')
-ylabel('Calibrated N(t)')
-title(['N(t) on N(t), CCC= ', num2str(CCC_N)])
+ylabel('Predicted N(t)')
+title(['N(t) on N(t) & \phi(t), CCC= ', num2str(CCC_N)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 subplot(1,3,3)
 plot(xh,yh,'-', 'LineWidth',2)
@@ -387,8 +397,8 @@ plot(phigiven, phifit, '.')
 xlim([xh(1) xh(end)])
 ylim([xh(1) xh(end)])
 xlabel('In silico \phi(t)')
-ylabel('Calibrated \phi(t)')
-title(['\phi(t) on \phi(t), CCC= ', num2str(CCC_phi)])
+ylabel('Predicted \phi(t)')
+title(['\phi(t) on N(t) & \phi(t), CCC= ', num2str(CCC_phi)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 %%
 pnames = {'rs', '\alpha', 'rr', 'ds'};
@@ -426,6 +436,8 @@ for i = 1:nfit
     title([pnames{i}, ' CCC= ' num2str(round(CCC_pmat(i),2)),', ', num2str(round(avg_perr(i))),'% error'])
     
 end
+mean_param_err = mean(avg_perr)
+
 %%
 
 figure;

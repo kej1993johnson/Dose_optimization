@@ -66,11 +66,14 @@ modelfunphi = @ (p)simmodelgreenephi(p, tbot, N0phi, pset, Ub, lengthvecphi, pfI
 model_phi = modelfunphi(pfset);
 model_phi_theta = modelfunphi(theta);
 model_N = modelfunN(pfset);
+modelfit = modelfunN(pbest2);
+modelfitphi = modelfunphi(pbest2);
 % phitrt is the data generated from those same parameters
 figure;
 plot(tbot, phitrt, '*','color', 'g')
 hold on
 plot(tbot, model_phi, '-','color', 'b', 'LineWidth',2)
+plot(tbot, modelfitphi, 'm-')
 plot(tbot, model_phi_theta, '-','color', 'r', 'LineWidth',2)
 plot(tbot, model_phi + 1.96*phisigfit, '-', 'color', 'k')
 plot(tbot, model_phi - 1.96*phisigfit, '-', 'color', 'k')
@@ -84,65 +87,71 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 figure;
 plot(ytimefit, ydatafit, '*','color', 'g')
 hold on
+plot(ytimefit, Ntrtstore(:,ind), 'k.')
 plot(ytimefit, model_N, 'o','color', 'b', 'LineWidth',2)
+plot(ytimefit, modelfit, 'ro')
 xlabel('time(hours)')
-ylabel('\phi(t)')
+ylabel('N(t)')
 title('Model fxn versus model generated data')
-legend('in silico data', 'model fxn', 'model fxn fit params','95% CI on data')
+legend('in silico data', 'in silico data', 'model fxn known params','model fxn fit params')
 legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
 %% Plot likelihood in time of data given model
 % reset theta
 theta2 = [pfset(1)+.03, pfset(2)-0.0002, pfset(3)+0.0003, pfset(4)+0.001]
 %%
-loglikelihoodphi_t =@(phat)log(normpdf(phitrt,modelfunphi(pbxform(phat)), 0.1));
-loglikelihoodN_t = @(phat)log(normpdf((ydatafit),(modelfunN(pbxform(phat))), sigmafit));
+sigmafit2 = sigmafit;
+loglikelihoodphi_t2= @(phat)(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
+loglikelihoodN_t2= @(phat)(log(2*pi.*(sigmafit2).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit2).^2);
+probs_phi = loglikelihoodphi_t2(pfxform(pfset))
+probs_N = loglikelihoodN_t2(pfxform(pfset))
 
-probs_phi = loglikelihoodphi_t(pfxform(pfset))
-probs_N = loglikelihoodN_t(pfxform(pfset))
-t1=loglikelihoodphi_t(pfxform(pfset));
-t2=loglikelihoodphi_t(pfxform(theta));
 figure;
-plot(tbot, loglikelihoodphi_t(pfxform(pfset)), '*')
+plot(tbot, loglikelihoodphi_t2(pfxform(pfset)), '*')
 hold on
-plot(ytimefit, loglikelihoodN_t(pfxform(pfset)),'*')
-legend ('true phi', 'true params N')
+plot(ytimefit, loglikelihoodN_t2(pfxform(pfset)),'g.')
+legend ('NLL phi', 'NLL N' )
 xlabel('time(hours)')
-ylabel('LL(mod;data)')
-title('Probability at each time point')
+ylabel('NLL(mod;data)')
+title('NLL for \phi & N')
 set(gca,'FontSize',20,'LineWidth',1.5)
-phisum = sum(loglikelihoodphi_t(pfxform(pfset)))
-Nsum = sum(loglikelihoodN_t(pfxform(pfset)))
+phisum = sum(loglikelihoodphi_t2(pfxform(pfset)))
+Nsum = sum(loglikelihoodN_t2(pfxform(pfset)))
 %%
-lambda = 0;
-loglikelihoodphi =@(phat)(sum(log(normpdf(phitrt,modelfunphi(pbxform(phat)), phisigfit))));
-loglikelihoodN = @(phat)(sum(log(normpdf(yfxform(ydatafit),yfxform(modelfunN(pbxform(phat))), sigmafit))));
-objfun = @(phat)-((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
-phatbest = fminsearch(objfun, pfxform(theta));
-pbest = pbxform(phatbest);
+lambda = 0.5;
+
+loglikelihoodphi2= @(phat)sum(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
+loglikelihoodN2= @(phat)sum(log(2*pi.*(sigmafit2).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit2).^2);
+
+objfun2 = @(phat)((1-lambda)*loglikelihoodN2(phat) + lambda*loglikelihoodphi2(phat));
+
+phatbest2 = fminsearch(objfun2, pfxform(theta));
+pbest2 = pbxform(phatbest2)
+negLL2 = objfun(phatbest2)
 
 figure;
-plot(tbot, loglikelihoodphi_t(pfxform(pfset)), '*')
+plot(tbot, loglikelihoodphi_t2(pfxform(pfset)), '*')
 hold on
-plot(tbot, loglikelihoodphi_t(pfxform(pbest)),'*')
+plot(tbot, loglikelihoodphi_t2(pfxform(pbest2)),'*')
 legend ('true params', 'fit params')
 xlabel('time(hours)')
-ylabel('LL(mod|\phi)')
+ylabel('NLL(mod|\phi)')
 title('Probability at each time point')
 set(gca,'FontSize',20,'LineWidth',1.5)
 fitsum = sum(loglikelihoodphi_t(pfxform(pbest)))
 truesum = sum(loglikelihoodphi_t(pfxform(pfset)))
 figure;
-plot(ytimefit, loglikelihoodN_t(pfxform(pfset)), '*')
+plot(ytimefit, loglikelihoodN_t2(pfxform(pfset)), '*')
 hold on
-plot(ytimefit, loglikelihoodN_t(pfxform(pbest)),'*')
+plot(ytimefit, loglikelihoodN_t2(pfxform(pbest2)),'*')
 legend ('true params', 'fit params')
 xlabel('time(hours)')
-ylabel('LL(mod|N)')
-title('Probability at each time point')
+ylabel('NLL(mod|N)')
+title('NLL at each time point')
 set(gca,'FontSize',20,'LineWidth',1.5)
-fitsum = sum(loglikelihoodphi_t(pfxform(pbest)))
-truesum = sum(loglikelihoodphi_t(pfxform(pfset)))
+phicontrib = sum(-loglikelihoodphi_t(pfxform(pbest)))
+Ncontrib = sum(-loglikelihoodN_t(pfxform(pbest)))
+negLL = objfun(phatbest)
 %%
 loglikelihoodN_t = @(phat)((log(normpdf(yfxform(ydatafit),yfxform(modelfunN(pbxform(phat))), sigmafit))));
 %loglikelihoodN= @(phat)sum(((ydatafit-modelfunN(pbxform(phat))).^2)./(2.*sigmafit.^2) + log(sigmafit.^2) + 0.5*log(2*pi));
@@ -164,10 +173,10 @@ loglikelihood = @(phat)loglikelihoodphi(phat);
     phatbest = fminsearch(objfun, pfxform(theta));
    
     pbest = pbxform(phatbest);
-
-    model_N = modelfunN(pbest);
-    model_phi = modelfunphi(pbest);
-   negLL = objfun(phatbest);
+%%
+    model_N = modelfunN(pbest2);
+    model_phi = modelfunphi(pbest2);
+   negLL = objfun(phatbest2);
    %%
    figure;
    subplot(1,2,1)
