@@ -22,8 +22,9 @@ Uvec = 0.*tvec;
 % Add in pulse treatments at the corresponding days
 % First pulse treatment starts at 0
 ind1 = find(ismember(tvec, 0:traj(i).doseduration/24))
-Uvec(ind1) = traj(i).prevdose
-% Second pulse treatment start at variable places given by the 
+Uvec(ind1) = traj(i).prevdose(1)
+%% Second pulse treatment start at variable places given by the 
+
 for j = 1:length(traj(i).doseints)
     ind = find(ismember(tvec, (traj(i).doseints(j)*7):((traj(i).doseints(j)*7)+traj(i).doseduration/24)));
     Uvec(ind)= traj(i).prevdose(j);
