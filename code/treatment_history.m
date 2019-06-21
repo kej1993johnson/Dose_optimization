@@ -8,10 +8,8 @@ close all; clear all; clc;
 %% Load in data structure 
 S = load('../out/trajraw.mat');
 traj= S.traj;
-%% pick well (row in traj) to graph
-i = 58;
-
-
+%% pick wells (rows in traj) to graph
+for i = 1:4
 %% following block is Kaitlyn's old time and dosage vectors
 %{
 % Start my making a time vector that spans the pre-treatment history + two
@@ -34,10 +32,11 @@ end
 %}
 %% time and dosage vectors to plot
 % generates tvec truncated after last dose
-tvec = 0:1:(sum(traj(i).doseintdays) + 2 + (3 * traj(i).numdoses));
+% 2 days before first dose, 2 days after last dose
+n = traj(i).numdoses;
+tvec = 0:1:(sum(traj(i).doseintdays) + 4 + (3 * n));
 % equalize vector length of y values
 uvec = 0.*tvec;
-n = traj(i).numdoses;
 % see "dosegraphindex.pdf" in documentation to understand this index jumping/modifying
 ind = 4;
 for j = 1:n
@@ -54,9 +53,13 @@ for j = 1:n
     end
 end    
 %% plot and format
-plot(tvec, uvec)
-uvec;
+subplot(2, 2, i)
+area(tvec,uvec)
+% individual labeling unnecessary for unified figure
+%{
 xlabel('time (days)')
 ylabel('Dose')
 title('Treatment History Example')
-set(gca,'FontSize',20,'LineWidth',1.5)
+%}
+set(gca,'FontSize',10,'LineWidth',1.5)
+end
