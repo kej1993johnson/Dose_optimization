@@ -60,7 +60,9 @@ modelfunphi = @ (p)simmodelgreenephi(p, tbot, N0phi, pset, Ub, lengthvecphi, pfI
 loglikelihoodphi= @(phat)sum(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
 loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit).^2);
 objfun=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
-phatbest = fminsearch(objfun, pfxform(theta));
+LB = pfxform(pbounds(:,1)');
+UB = pfxform(pbounds(:,2)');
+phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
 pbest = pbxform(phatbest);
 
 

@@ -13,9 +13,18 @@
 % actual data.
  close all; clear all; clc
  
- %% Load in data
+ %% Load in data from 231s and from fit
 S = load('../out/trajfit231.mat');
 traj= S.traj;
+
+% Use the fit parameters from N(t) only to make the parameter domains
+p4fit = load('../out/p4fit231.mat');
+p4fit = struct2cell(p4fit);
+p4fit = cell2mat(p4fit);
+P = num2cell(p4fit);
+[rsf, carcapf, alphaf, rrf, dsf, drf] = deal(P{:});
+
+
 % Separate by dose
 uniqdose = [];
 doselist = [];
@@ -106,8 +115,8 @@ end
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
          text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean + 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
         xlabel('time (hours)')
         ylabel('N(t)')
         title('N(t) for different single pulse treatments')
@@ -124,18 +133,25 @@ end
 %% Set & store known parameters
 nsamps = 100;
 
+% Make your parameter domains vary by +/- 20% of the current fitted 231
+% vals
+factor = 0.2;
+%[rsf, carcapf, alphaf, rrf, dsf, drf]
+phi0f= 0.92; % current estimate of the initial sensitve cell fraction
 
-phidom =linspace(0.9,1,100);
-rsdom = linspace(1e-3, 1e-2, 100);
-carcapdom = linspace(4.8e4, 5.5e4, 100);
-alphadom = linspace(0, 1e-3, 100);
-rrdom = linspace(1e-4, 5e-3, 100);
-dsdom = linspace(1e-5,1e-4, 100);
+phidom =linspace((phi0f*(1-factor)), (phi0f*(1+factor)),nsamps);
+rsdom = linspace((rsf*(1-factor)), (rsf*(1+factor)), nsamps);
+carcapdom = linspace((carcapf*(1-factor)), (carcapf*(1+factor)), nsamps);
+alphadom = linspace((alphaf*(1-factor)),(alphaf*(1+factor)), nsamps);
+rrdom = linspace((rrf*(1-factor)), (rrf*(1+factor)), nsamps);
+dsdom = linspace((drf*(1-factor)), (drf*(1+factor)), nsamps);
+%% Add drdom, and make it overlap with dsdom
 
-% Make your pbounds the domain of reasonable parameters
+
+% Make your pbounds the domain 
 pbounds(:,1)= vertcat(rsdom(1), alphadom(1), rrdom(1), dsdom(1));
 pbounds(:,2) = vertcat(rsdom(end), alphadom(end), rrdom(end), dsdom(end));
-dr = 0;
+
 for i = 1:nsamps
     phi0=randsample(phidom,1);
     rs = randsample(rsdom,1);
@@ -147,12 +163,16 @@ for i = 1:nsamps
         rr=rs;
     end
     ds = randsample(dsdom,1);
-
-    pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds, dr];
+    dr = randsample(drdom,1);
+    % ensure true dr< ds
+    if ds< dr
+        dr=ds-1e-12;
+    end
+    pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds ,dr];
     rstar = phi0/(1-phi0);
     puntfstore(i,:) = [carcap];
     % Add dr to the stored pfit
-    pfitstore(i,:) = [ rs, alpha, rr, ds];
+    pfitstore(i,:) = [ rs, alpha, rr, ds, dr];
 end
 %% Generate untreated control data
 % Fit this only to N(t) 
@@ -188,7 +208,7 @@ for i = 1:nsamps
 end   
 %%
 figure;
-ind = 22;
+ind = 21;
 plot(ytimeunt, Nstoreunt(:,ind), '*')
 hold on
 plot(ytimeunt, Nfitunt(:,ind), '-')
@@ -204,8 +224,8 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 %% Generate dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
 % Change pset to only phi0 and carcap
-psetID = [1, 3, 7];
-pfitID = [2, 4, 5, 6];
+psetID = [1, 3];
+pfitID = [2, 4, 5, 6, 7];
 % Get what we need from real data
 sigmafit = [];
 ytimefit = [];
@@ -241,8 +261,8 @@ for i = 1:nsamps
     P=num2cell(pallstore(i,:));
     [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
     % again change these so we fit dr
-    pset = [phi0, carcap, dr];
-    pfset = [rs, alpha, rr, ds];
+    pset = [phi0, carcap];
+    pfset = [rs, alpha, rr, ds, dr];
     Ntrt = [];
     phitrt = [];
     for j = 2:6
@@ -300,13 +320,14 @@ for i = 1:nsamps
     gtot = puntfit(i,1);
     carcapfit = puntfit(i,2);
     % change the set and fit values
-    pset = [phi0, carcapfit, dr];
+    pset = [phi0, carcapfit];
     rrguess = 1e-2*gtot;
     rstar = phi0/(1-phi0);
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
     alphaguess = 0.0035;
     dsguess = 0.001;
-    theta = [rsguess, alphaguess, rrguess, dsguess];
+    drguess = 0.1*dsguess;
+    theta = [rsguess, alphaguess, rrguess, dsguess, drguess];
     
     %Give this function both Ntrt and phitrt
     % can toggle the amount that we weigh each portion..
@@ -323,8 +344,7 @@ for i = 1:nsamps
     CCC_vec(i,3)=f_CCC([pfset', pbestf'], 0.05);
 end
 %%
-for i =18
-    
+for i =26
     ind = i;
 figure;
 subplot(1,2,1)
@@ -417,7 +437,7 @@ ylabel('Predicted \phi(t)')
 title(['\phi(t) on N(t) & \phi(t), CCC= ', num2str(CCC_phi)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 %%
-pnames = {'rs', '\alpha', 'rr', 'ds'};
+pnames = {'rs', '\alpha', 'rr', 'ds', 'dr'};
 % Calculate average percent parameter error
 param_err = 100*abs(pgiven-pfit)./pgiven;
 index = param_err == Inf;
@@ -440,7 +460,7 @@ for i = 1:nfit
     xp = linspace(min(pg), max(pg), length(pg));
     yp = xp;
 
-    subplot(1, 4, i)
+    subplot(1, 5, i)
     plot(xp,yp,'-', 'LineWidth',2)
     hold on
     plot(pg, pf, '*', 'LineWidth',2)
@@ -458,7 +478,7 @@ mean_param_err = mean(avg_perr)
 
 figure;
 for i=1:5
-    subplot(1, 4, i) 
+    subplot(1, 5, i) 
     plot(1:1:nsamps, pfitstore(:,i))
     hold on
     plot(1:1:nsamps, pfittrt(:,i))

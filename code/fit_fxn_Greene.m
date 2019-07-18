@@ -1,4 +1,4 @@
-function [pbest,model_N, negLL] = fit_fxn_Greene(ydatafit, sigmafit, pfID, psetID, pfit, pset, time, Uvec, lengthvec, N0s, pbounds) 
+function [pbest,model_N, negLL] = fit_fxn_Greene(ydatafit, sigmafit, pfID, psetID, theta, pset, time, Uvec, lengthvec, N0s, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD, negLLGD]
 %Write a fucntion that fits any combination of the paramters in the
 %simplest Greene model with the following parameters:
@@ -27,7 +27,7 @@ for i = 1:length(params)
     end
     indfit = find(ismember(pfID,i));
     if ~isempty(indfit)
-    params(i) = pfit(indfit);
+    params(i) = theta(indfit);
     end
 end
 P = num2cell(params);
@@ -35,25 +35,25 @@ P = num2cell(params);
  
 % Define transforms 
 % for number of variables in pfit
-nfit = length(pfit);
+nfit = length(theta);
 pfxform = @(pval)ones(1,nfit).*log(pval); %'forward' parameter transform into Reals
 pbxform = @(phat)ones(1,nfit).*exp(phat);  %'backward' parameter transform into model space
 yfxform = @(y)log(y); % 'forward' transform for data and model output
 ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
 
 
-theta = pfit; 
+
 
 % write a function that takes set parameters and fit parameters, combines
 % them, and runs the model forward for the Uvec and 0s provided
 modelfun = @(p)simmodelgreene(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID); 
 
 loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxform(phat))), sigmafit)));
-  
-   
+LB = pfxform(pbounds(:,1)');
+UB = pfxform(pbounds(:,2)');
     % Write objective functions for each model
     objfun = @(phat)-loglikelihood(phat); 
-    phatbest = fminsearch(objfun, pfxform(theta));
+    phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
     
     pbest = pbxform(phatbest);
 

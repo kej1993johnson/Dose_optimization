@@ -1,37 +1,36 @@
 % This script loads in the traj structure which contains the dose response
-% for all conditions. It creates the trajsum structure which will contain a
-% mean vector and U(t) vector for each different concentration tested. This
-% will be used to calibrate to the model.
+% for all conditions for the 231 data. It creates the trajsum structure which will contain a
+% mean vector and U(t) vector for each different concentration tested.
+
+% Add to this to also include the phi(t) dynamics for the scRNA seq
+% treatment.
+
+% This is still up in the air in terms of the time point of the
+% post-treatment sample, but make an estimate for now to test the
+% framework.
+
+% We want to fit for dr as well, since based on scRNA seq we think dr>0
+% since we observe cells in pre-treatment time point in resistant cell
+% states that don't end up "surviving" via their recorded lineage
+% abundance.
+
+
  close all; clear all; clc
  
  %% Load in data structure 
-S = load('../out/trajfit.mat');
+S = load('../out/trajfit231.mat');
 traj= S.traj;
-%% Look only at MCF-7s
-ntot = length(traj);
-%
-for i = 1:ntot
-matches= ismember(traj(i).celltype, 'MCF-7');
-ind(i) = all(matches, 'all');
-end
-trajM = traj(ind);
-traj = trajM;
-% Separate by dose
-uniqdose = [];
-doselist = [];
-for i = 1:length(traj)
-    if ~isempty(traj(i).dosenum)
-    if traj(i).dosenum==1 || traj(i).dosenum == 0
-    doselist =vertcat(doselist, traj(i).dose);
-    end
+for j = 1:length(traj)
+    if traj(j).numdoses == 1
+        doses(j) = traj(j).dose;
     end
 end
-uniqdose= unique(doselist);
+uniqdose= unique(doses);
 % Make a new structure which combines each dox concentration
     % percapita growth rate 
     % variance of per capita growth rate
  
- % find groups by N0
+ % find groups by dose
  for i = 1:length(uniqdose)
     trajsum(i).Cdox = [];
     trajsum(i).Nmat = [];
@@ -41,7 +40,7 @@ uniqdose= unique(doselist);
 
  for i = 1:length(uniqdose) % number of unique seed numbers
     for j = 1:length(traj)
-        date = {'8-16-18'}; % pull from the same experiment: first treat
+        date = {'5-6-19'}; % pull from the same experiment: first treat
         if contains(traj(j).date, date)  % only want data from this run
                 if traj(j).dose == uniqdose(i)
                     trajsum(i).nreps = trajsum(i).nreps +1;
@@ -67,9 +66,9 @@ uniqdose= unique(doselist);
  % Again, clean data for fitting...
  for i = 1:length(trajsum)
     if i ==1
-    Nfin = 5.5e4;
+    Nfin = 5e4;
     else
-    Nfin = 4e4;
+    Nfin = 3.5e4;
     end
      N = trajsum(i).Nmat;
     t = trajsum(i).tmat;
@@ -102,19 +101,22 @@ end
  %% Test and set U(t) curves
 % Set some arbitrary things as inputs
 
-kdrug = 0.0175;
+kdrug = 0.04;
 k = 0.5;
 dt = 1;
+Cdoxmax= 1000;
 % input time vectors for each different dose response
 figure;
 for i = 1:length(trajsum)
     ttest = [];
     ttest = 0:dt:trajsum(i).tvec(end);
     Cdox = trajsum(i).Cdox;
-    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest)); 
+    % Make the U(t) vectors normalized so that ds and dr are a similar
+    % order of magnitude to rs and rr
+    trajsum(i).U = (k*Cdox*exp(-kdrug*(ttest)))./(0.1*Cdoxmax); 
     subplot(1, length(trajsum),i)
     plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
-    ylim([0 300])
+    ylim([0 1])
     xlim([ 0 ttest(end)])
     xlabel('time (hours)')
     ylabel('Effective dose (U(t))')
@@ -129,16 +131,17 @@ for i = 1:length(trajsum)
 end
 % Plot the average data 
   figure;
- for i = 1:6%length(trajsum)
+ for i = 1:length(trajsum)
      subplot(2,1,1)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
          text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean + 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
         xlabel('time (hours)')
         ylabel('N(t)')
         title('N(t) for different single pulse treatments')
+         set(gca,'FontSize',20,'LineWidth',1.5)
         dt = 1;
        subplot(2,1,2)
        ttest = [];
@@ -148,19 +151,20 @@ end
         xlabel('time (hours)')
         ylabel('Effective dose U(t)')
         title('U(t) for different single pulse treatments')
+         set(gca,'FontSize',20,'LineWidth',1.5)
  end
 
 
 %% Test forward model
 % set parameters of forward model
 carcap = 5.2409e4;
-S0=trajsum(1).Nmean(1); % set initial conditions (assume all cells sensitive to start)
-R0 = 0; 
+S0=0.9*trajsum(1).Nmean(1); % set initial conditions (assume all cells sensitive to start)
+R0 = 0.1*trajsum(1).Nmean(1); 
 rs = 0.0287;
 rr = 0.001;
-ds = 0.002;
+ds = 0.2;
 dr = 0;
-alpha =0; %0.0001;
+alpha =0.1; %0.0001;
 
 
 p = [ S0, R0, rs, carcap, alpha, rr, ds, dr];
@@ -214,23 +218,15 @@ carcap = punt(2);
     legend box off
     title ('Fit for g_{tot} & K using untreated control')
     set(gca,'FontSize',20,'LineWidth',1.5)
-%% Use gtot to guess gs and gr from Sui Huang's paper
-% We have the expression for gtot at equilibrium. If we assume that prior
-% to treat, phenotypic equilibrium occurs (i.e. phi is constant), then we
-% have:
-% gtot = (gs*rstar + gr)/(rstar+1)
-% solve for the expected relationship between gs and gr in terms of gtot &
-% rstar. rstar = S/R whereas phi0 = S/N
 
-dr = 0;
-phi0 = 0.8;
-rstar= phi0/(1-phi0);
  %% Now use this and fit for gr, ds, and alpha from single pulse treatments
 
-dr = 0;
-phi0 = 0.8;
+dr=0;
+phi0 = 0.92; % Set this from the scRNAseq from pre-treatment
+rstar= phi0/(1-phi0);
 pset = [phi0, carcap, dr];
 %params = [phi, rs, carcap, alpha, rr, ds, dr];
+% Now we want to allow dr to be non-zero
 psetID = [1, 3, 7];
 
 %% Bayesian fit for alpha, rr, and ds using all treatments
@@ -270,10 +266,10 @@ lengthvec = horzcat(lengtht, lengthU);
 
 pfID = [ 2, 4, 5, 6];
 
-alphaguess =  1e-3;
-rrguess = 1e-7;
+alphaguess =  0.1;
+rrguess = 1e-3;
 rsguess = ((rstar+1)*gtot - rrguess)./rstar; % expression that relates gs, gr, and gtot
-dsguess = 5e-3;
+dsguess = 0.2;
 pfitguess = [rsguess, alphaguess, rrguess, dsguess]; 
 
 %test out the initial guess parameters 
@@ -295,18 +291,32 @@ title ('Fit for \alpha, rr and ds')
 
 
 %% Try to run your fitting function
+% Set some guesses for your phitrt and phisigfit
+%phitrt = [0.1, 0.7];
+%phisigfit = [0.1, 0.1];
+Ntrt = ydatafit;
 pbounds = [0,1; 0, 1; 0, 1; 0,1];
+%lambda = 0.9;
+%N0phi = [phi0*N0, (1-phi0)*N0];
+%tbot = [30 1008];
+% Need Ub and lengthvecphi-- which are the effective dose and the size of
+% the data for the phi data aspects
+
+
 %[pbestf,N_model, negLL, pbestGD, N_modelGD, negLLGD]
+% Here is where we will replace fit_fix_Greene with fit_fxn_Greenephi_N
+%[pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 [pbestf,N_model, negLL] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s, pbounds);
 CCC = corrcoef(N_model,ydatafit);
 rs = pbestf(1);
 alpha = pbestf(2);  
 rr = pbestf(3);
 ds = pbestf(4);
+%dr = pbestf(5);
 %%
 chi_sq = sum(((N_model-ydatafit)./sigmafit).^2)
 %chi_sqGD = sum(((N_modelGD-ydatafit)./sigmafit).^2)
-%%    
+%%   
     figure;
     plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
     hold on
@@ -317,7 +327,7 @@ chi_sq = sum(((N_model-ydatafit)./sigmafit).^2)
     ylabel(' N(t)')
     legend ('data from mult treatments', 'model fit')
     legend box off
-    title ('Fit for \alpha, rr and ds')
+    title ('Fit for \alpha, rr, ds and dr')
     set(gca,'FontSize',20,'LineWidth',1.5)
 %% Plot calibrated data
 N0 = 2e3;
@@ -328,12 +338,12 @@ p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
      subplot(2,1,1)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean + 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
        
          xlabel('time (hours)')
         ylabel('N(t)')
-        title('Model calibration to pulsed treatments 10-75 nM')
+        title('Model calibration to pulsed treatments 25-150 nM')
         dt = 1;
         tvec = [];
         Nsri = [];
@@ -360,10 +370,10 @@ p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
         title('Effective dose of each pulse treatment')
         set(gca,'FontSize',20,'LineWidth',1.5)
  end
- %% Save calibrated parameters from MCF-7s with 4 doses 10-75 nM
+ %% Save calibrated parameters from 231s with 4 doses 25-150 nM
  
-p4fit= [rs, carcap, alpha, rr, ds, dr];
-save('../out/p4fit', 'p4fit')
+p4fit= [rs, carcap, alpha, rr, ds, dr, k, kdrug];
+save('../out/p4fit231', 'p4fit')
 % Save trajsum
 %p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
 for i = 1:length(trajsum)
@@ -386,7 +396,6 @@ for i = 1:length(trajsum)
     trajsum(i).kdrug =kdrug;
 end
 
-%% Save the parameter estimates
-p4fit= [rs, carcap, alpha, rr, ds, dr];
-save('../out/p4fit', 'p4fit')
-save('../out/trajsumfit.mat', 'trajsum')
+%% Save the trajsum
+
+save('../out/trajsumfit231.mat', 'trajsum')

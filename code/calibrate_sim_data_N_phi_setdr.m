@@ -13,9 +13,18 @@
 % actual data.
  close all; clear all; clc
  
- %% Load in data
+ %% Load in data from 231s and from fit
 S = load('../out/trajfit231.mat');
 traj= S.traj;
+
+% Use the fit parameters from N(t) only to make the parameter domains
+p4fit = load('../out/p4fit231.mat');
+p4fit = struct2cell(p4fit);
+p4fit = cell2mat(p4fit);
+P = num2cell(p4fit);
+[rsf, carcapf, alphaf, rrf, dsf, drf, k, kdrug] = deal(P{:});
+
+
 % Separate by dose
 uniqdose = [];
 doselist = [];
@@ -75,16 +84,17 @@ uniqdose= unique(doselist);
     trajsum(i).tvec = trajsum(i).tfit(:,1);
 end
 % Test and set U(t) curves
-kdrug = 0.0175;
-k = 0.7;
+
 dt = 1;
+Cdoxmax= 5000;
 % input time vectors for each different dose response
 figure;
 for i = 1:length(trajsum)
     ttest = [];
     ttest = 0:dt:trajsum(i).tvec(end);
     Cdox = trajsum(i).Cdox;
-    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest)); 
+    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest));
+    trajsum(i).U = (k*Cdox*exp(-kdrug*(ttest)))./(0.1*Cdoxmax);
     subplot(1, length(trajsum),i)
     plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
     ylim([0 300])
@@ -106,8 +116,8 @@ end
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
          text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean + 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
         xlabel('time (hours)')
         ylabel('N(t)')
         title('N(t) for different single pulse treatments')
@@ -124,18 +134,25 @@ end
 %% Set & store known parameters
 nsamps = 100;
 
+% Make your parameter domains vary by +/- 20% of the current fitted 231
+% vals
+factor = 0.4;
+%[rsf, carcapf, alphaf, rrf, dsf, drf]
+phi0f= 0.92; % current estimate of the initial sensitve cell fraction
+dr =0;
+phidom =linspace((phi0f*(1-factor)), (phi0f*(1+factor)),nsamps);
+rsdom = linspace((rsf*(1-factor)), (rsf*(1+factor)), nsamps);
+carcapdom = linspace((carcapf*(1-factor)), (carcapf*(1+factor)), nsamps);
+alphadom = linspace((alphaf*(1-factor)),(alphaf*(1+factor)), nsamps);
+rrdom = linspace((rrf*(1-factor)), (rrf*(1+factor)), nsamps);
+dsdom = linspace((dsf*(1-factor)), (dsf*(1+factor)), nsamps);
+%% Store randomly sampled parameters
 
-phidom =linspace(0.9,1,100);
-rsdom = linspace(1e-3, 1e-2, 100);
-carcapdom = linspace(4.8e4, 5.5e4, 100);
-alphadom = linspace(0, 1e-3, 100);
-rrdom = linspace(1e-4, 5e-3, 100);
-dsdom = linspace(1e-5,1e-4, 100);
 
-% Make your pbounds the domain of reasonable parameters
+% Make your pbounds the domain 
 pbounds(:,1)= vertcat(rsdom(1), alphadom(1), rrdom(1), dsdom(1));
 pbounds(:,2) = vertcat(rsdom(end), alphadom(end), rrdom(end), dsdom(end));
-dr = 0;
+%%
 for i = 1:nsamps
     phi0=randsample(phidom,1);
     rs = randsample(rsdom,1);
@@ -147,7 +164,7 @@ for i = 1:nsamps
         rr=rs;
     end
     ds = randsample(dsdom,1);
-
+    
     pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds, dr];
     rstar = phi0/(1-phi0);
     puntfstore(i,:) = [carcap];
@@ -156,7 +173,7 @@ for i = 1:nsamps
 end
 %% Generate untreated control data
 % Fit this only to N(t) 
-sigmaunt = trajsum(1).Nstd(1:end);
+sigmaunt = (trajsum(1).Nstd(1:end)); % normpdf requires the stdev, not the variance
 ytimeunt = trajsum(1).tvec;
 Uunt = trajsum(1).U;
 N0unt = trajsum(1).Nmean(1);
@@ -188,7 +205,7 @@ for i = 1:nsamps
 end   
 %%
 figure;
-ind = 22;
+ind = 67;
 plot(ytimeunt, Nstoreunt(:,ind), '*')
 hold on
 plot(ytimeunt, Nfitunt(:,ind), '-')
@@ -230,10 +247,11 @@ lengthvec = horzcat(lengtht, lengthU);
 % to start
 Cdox = 550;
 tgen = [0:1:1344];
-tbot = [0; 1200; 1344];
-tbot = [0:4:1344]; % simulate have a pre-treatment and two 
+% simulate have a pre-treatment and two 
 %post-treatment time points that are both far out
-Ub=k*Cdox*exp(-kdrug*(tgen));
+%tbot = [0; 1176; 1656]; 
+tbot = [0:4:1344]; % Pretend we could assess phi every 4 hours
+Ub=k*Cdox*exp(-kdrug*(tgen))./(0.1*Cdoxmax);
 lengthvecphi = [length(tbot), length(tgen)];
 lam = 100;
 for i = 1:nsamps
@@ -241,10 +259,11 @@ for i = 1:nsamps
     P=num2cell(pallstore(i,:));
     [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
     % again change these so we fit dr
-    pset = [phi0, carcap, dr];
+    pset = [phi0, carcap];
     pfset = [rs, alpha, rr, ds];
     Ntrt = [];
     phitrt = [];
+    % Loop through and simulate the 24 hour pulsed treatment N(t) data
     for j = 2:6
         Nsr = [];
         U = trajsum(j).U;
@@ -263,13 +282,13 @@ for i = 1:nsamps
     end
         % Generate bottlenecked data for phi(t)
         N0phi = 2e3; % set this because this is what we think we seeded
-        S0 = phi0*N0phi;
-        R0 = (1-phi0)*N0phi;
-        pit2 = [S0, R0, rs, carcap, alpha, rr, ds, dr];
+        S0phi = phi0*N0phi;
+        R0phi = (1-phi0)*N0phi;
+        pit2 = [S0phi, R0phi, rs, carcap, alpha, rr, ds, dr];
         [Nb, ~,~]=fwd_Greene_model(pit2, tbot, Ub, dt, tdrug);
         Nbnoise=Nb; % set it as this then replace it
         Nbnoise(:,2:3) = Nb(:,2:3) + normrnd(0, lam,[length(tbot) 2]);
-        % remove negative numbers
+        % remove negative number of cells
         for j =1:length(Nbnoise)
             if Nbnoise(j,2) <0
                 Nbnoise(j,2)=0;
@@ -301,11 +320,11 @@ for i = 1:nsamps
     carcapfit = puntfit(i,2);
     % change the set and fit values
     pset = [phi0, carcapfit, dr];
-    rrguess = 1e-2*gtot;
+    rrguess = rrf;
     rstar = phi0/(1-phi0);
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
-    alphaguess = 0.0035;
-    dsguess = 0.001;
+    alphaguess = alphaf;
+    dsguess = dsf;
     theta = [rsguess, alphaguess, rrguess, dsguess];
     
     %Give this function both Ntrt and phitrt
@@ -323,8 +342,7 @@ for i = 1:nsamps
     CCC_vec(i,3)=f_CCC([pfset', pbestf'], 0.05);
 end
 %%
-for i =18
-    
+for i =28
     ind = i;
 figure;
 subplot(1,2,1)
@@ -458,7 +476,7 @@ mean_param_err = mean(avg_perr)
 
 figure;
 for i=1:5
-    subplot(1, 4, i) 
+    subplot(1, 5, i) 
     plot(1:1:nsamps, pfitstore(:,i))
     hold on
     plot(1:1:nsamps, pfittrt(:,i))

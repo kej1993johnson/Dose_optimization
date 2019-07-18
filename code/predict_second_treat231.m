@@ -25,7 +25,7 @@ kdrug = 0.0175;
 k = 0.7;
 tdrug =1; % stands for first treatment
 dt = 1;
-
+phi0=0.57; % from scRNASeq pre-treatment
 
 % Pull from trajsum dose = 75
 for i = 1:length(trajsum)
@@ -34,12 +34,12 @@ for i = 1:length(trajsum)
         Nmean = trajsum(i).Nmean;
         Nstd = trajsum(i).Nstd;
         U1 = trajsum(i).U;
-        S0 = trajsum(i).Nmean(1);
+        S0 = phi0*trajsum(i).Nmean(1);
     end
 
 end
 tvecdat = tvec;
-R0 = 0;
+R0 = (1-phi0)*trajsum(i).Nmean(1);
 p = [ S0, R0, rs, carcap, alpha, rr, ds, dr];
 tlong = 0:1:1344;
 tvec = tlong; % simulate long term treatment dynamics
