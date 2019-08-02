@@ -1,3 +1,6 @@
+% Reparametrize model so that we fit growth rate ratio and death rate
+% ratio.
+
 % This script tests the calibration method by randomly sampling parameter
 % space, generating in silico data, and running the calibration using
 % phi(t) & N(t).
@@ -6,6 +9,8 @@
 % phi(t) time points and repeats the calibration, and also varies lambda,
 % the regularization term. 
  
+% Redo this analysis, adding in dr as a free parameters
+% We need to figure out how to ensure that dr<ds and rr<rs
 
 % It uses the N0s, time vectors, and error in data for weighting from the
 % actual data.
@@ -82,20 +87,18 @@ uniqdose= unique(doselist);
     trajsum(i).tvec = trajsum(i).tfit(:,1);
 end
 % Test and set U(t) curves
-
 dt = 1;
-Cdoxmax= 5000;
+Cdoxmax = 1000;
 % input time vectors for each different dose response
 figure;
 for i = 1:length(trajsum)
     ttest = [];
     ttest = 0:dt:trajsum(i).tvec(end);
     Cdox = trajsum(i).Cdox;
-    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest));
-    trajsum(i).U = (k*Cdox*exp(-kdrug*(ttest)))./(0.1*Cdoxmax);
+    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest))/(0.1*Cdoxmax);  
     subplot(1, length(trajsum),i)
     plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
-    ylim([0 300])
+    ylim([0 1])
     xlim([ 0 ttest(end)])
     xlabel('time (hours)')
     ylabel('Effective dose (U(t))')
@@ -130,48 +133,48 @@ end
         title('U(t) for different single pulse treatments')
  end
 %% Set & store known parameters
-nsamps = 100;
+% Start with just one set of parameter values, so o
+nsamps = 1;
 
 % Make your parameter domains vary by +/- 20% of the current fitted 231
 % vals
-factor = 0.4;
+factor = 0.2;
 %[rsf, carcapf, alphaf, rrf, dsf, drf]
 phi0f= 0.92; % current estimate of the initial sensitve cell fraction
-dr =0;
-phidom =linspace((phi0f*(1-factor)), (phi0f*(1+factor)),nsamps);
-rsdom = linspace((rsf*(1-factor)), (rsf*(1+factor)), nsamps);
-carcapdom = linspace((carcapf*(1-factor)), (carcapf*(1+factor)), nsamps);
-alphadom = linspace((alphaf*(1-factor)),(alphaf*(1+factor)), nsamps);
-rrdom = linspace((rrf*(1-factor)), (rrf*(1+factor)), nsamps);
-dsdom = linspace((dsf*(1-factor)), (dsf*(1+factor)), nsamps);
-%% Store randomly sampled parameters
+
+phidom =linspace(0.7,1,100);
+rsdom = linspace(0.001, 0.05, 100); 
+zrdom = linspace(0.1, 0.5, 100);% require that 0< zr = rr/rs<1 sensitive cell growth rate must be higher
+carcap1dom = linspace(4.8e4, 5.5e4, 100);
+alphadom = linspace(0, 0.1, 100);
+dsdom = linspace(0.02,0.05, 100);
+zddom= linspace (0.1,0.5,100); % require that 0< zd = dr/ds <1 resistant cell growth rate must be higher
+
+% Free parameters are still to set bounds are are: rs, zr, alpha, ds, and zd where
+ % rr = zr*rs & dr = zd*ds
+pbounds = [0,1; 0,1; 0,1; 0,1; 0,1]; % loose bounds on rs, zr, alpha, ds, and zd
+
+%% Sample from domain to set your known parameters
 
 
-% Make your pbounds the domain 
-pbounds(:,1)= vertcat(rsdom(1), alphadom(1), rrdom(1), dsdom(1));
-pbounds(:,2) = vertcat(rsdom(end), alphadom(end), rrdom(end), dsdom(end));
-%%
 for i = 1:nsamps
     phi0=randsample(phidom,1);
     rs = randsample(rsdom,1);
-    carcap = randsample(carcapdom,1);
+    carcap1 = randsample(carcap1dom,1);
     alpha = randsample(alphadom,1);
-    rr = randsample(rrdom,1);
-    % don't let resistant grow faster than sensitive population
-    if rs< rr
-        rr=rs;
-    end
+    rr = rs*randsample(zrdom,1);  
     ds = randsample(dsdom,1);
-    
-    pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds, dr];
+    dr = ds*randsample(zddom,1);
+    carcap2 = 20e8; % exaggerate this because the whole point is this shouldn't have reached carcap
+    pallstore(i,:) = [phi0, rs,carcap1, carcap2, alpha, rr, ds ,dr];
     rstar = phi0/(1-phi0);
-    puntfstore(i,:) = [carcap];
+    puntfstore(i,:) = [carcap1, carcap2];
     % Add dr to the stored pfit
-    pfitstore(i,:) = [ rs, alpha, rr, ds];
+    pfitstore(i,:) = [ rs, alpha, rr, ds, dr];
 end
 %% Generate untreated control data
 % Fit this only to N(t) 
-sigmaunt = (trajsum(1).Nstd(1:end)); % normpdf requires the stdev, not the variance
+sigmaunt = trajsum(1).Nstd(1:end);
 ytimeunt = trajsum(1).tvec;
 Uunt = trajsum(1).U;
 N0unt = trajsum(1).Nmean(1);
@@ -180,11 +183,11 @@ eta=500;
 
 for i = 1:nsamps
     P= num2cell(pallstore(i,:));
-    [phi0, rs, carcap, alpha, rr, ds ,dr]= deal(P{:});
+    [phi0, rs, carcap1, carcap2, alpha, rr, ds ,dr]= deal(P{:});
     S0 = N0unt*phi0;
     R0 = N0unt*(1-phi0);
     P= num2cell(pallstore(i,:));
-    pit = [S0,R0, rs, carcap, alpha, rr, ds, dr];
+    pit = [S0,R0, rs, carcap1, alpha, rr, ds, dr];
     % Generate in silico data and store it
     [Nsrunt, ~,~] = fwd_Greene_model(pit, ytimeunt, Uunt, dt, tdrug);
     Nunt = Nsrunt(:,1) + normrnd(0, eta,[length(ytimeunt) 1]);
@@ -203,7 +206,7 @@ for i = 1:nsamps
 end   
 %%
 figure;
-ind = 67;
+ind = 1;
 plot(ytimeunt, Nstoreunt(:,ind), '*')
 hold on
 plot(ytimeunt, Nfitunt(:,ind), '-')
@@ -219,8 +222,8 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 %% Generate dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
 % Change pset to only phi0 and carcap
-psetID = [1, 3, 7];
-pfitID = [2, 4, 5, 6];
+psetID = [1, 3, 4];
+pfitID = [2, 5, 6, 7, 8]; % corresponds to rs, alpha, rr, ds, dr
 % Get what we need from real data
 sigmafit = [];
 ytimefit = [];
@@ -244,24 +247,25 @@ lengthvec = horzcat(lengtht, lengthU);
 % We are going to pretend we can capture phi(t) for 8 weeks every 4 hours
 % to start
 Cdox = 550;
-tgen = [0:1:1344];
-% simulate have a pre-treatment and two 
-%post-treatment time points that are both far out
-%tbot = [0; 1176; 1656]; 
-tbot = [0:4:1344]; % Pretend we could assess phi every 4 hours
-Ub=k*Cdox*exp(-kdrug*(tgen))./(0.1*Cdoxmax);
+tgen = [0:1:1656];
+tbot = [0 1176 1656];
+%tbot = [0:4:1656]; % simulate have a pre-treatment and two 
+%post-treatment time points that are both far out 
+Ub=k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
 lengthvecphi = [length(tbot), length(tgen)];
-lam = 100;
+lam = 10;
+% For the carrying capacity of the scRNAseq run- this needs to change to
+% reflect the larger expansion: i.e. estimate of 100% confluence in a 15 cm
+% plate. We can just set this. 
 for i = 1:nsamps
     
     P=num2cell(pallstore(i,:));
-    [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
+    [phi0, rs, carcap1, carcap2, alpha, rr, ds, dr]= deal(P{:});
     % again change these so we fit dr
-    pset = [phi0, carcap];
-    pfset = [rs, alpha, rr, ds];
+    pset = [phi0, carcap1, carcap2];
+    pfset = [rs, alpha, rr, ds, dr];
     Ntrt = [];
     phitrt = [];
-    % Loop through and simulate the 24 hour pulsed treatment N(t) data
     for j = 2:6
         Nsr = [];
         U = trajsum(j).U;
@@ -269,7 +273,7 @@ for i = 1:nsamps
         N0 = trajsum(j).Nmean(1);
         S0 = phi0*N0;
         R0 = (1-phi0)*N0;
-        pit = [S0, R0, rs, carcap, alpha, rr, ds, dr]; 
+        pit = [S0, R0, rs, carcap1, alpha, rr, ds, dr]; 
         % Generate data for N(t)
         [Nsr, ~, ~] = fwd_Greene_model(pit, tvec, U, dt, tdrug);
         Nsrdat = Nsr(:,2:3) + normrnd(0, eta,[length(tvec) 2]);
@@ -280,13 +284,13 @@ for i = 1:nsamps
     end
         % Generate bottlenecked data for phi(t)
         N0phi = 2e3; % set this because this is what we think we seeded
-        S0phi = phi0*N0phi;
-        R0phi = (1-phi0)*N0phi;
-        pit2 = [S0phi, R0phi, rs, carcap, alpha, rr, ds, dr];
+        S0 = phi0*N0phi;
+        R0 = (1-phi0)*N0phi;
+        pit2 = [S0, R0, rs, carcap2, alpha, rr, ds, dr];
         [Nb, ~,~]=fwd_Greene_model(pit2, tbot, Ub, dt, tdrug);
         Nbnoise=Nb; % set it as this then replace it
         Nbnoise(:,2:3) = Nb(:,2:3) + normrnd(0, lam,[length(tbot) 2]);
-        % remove negative number of cells
+        % remove negative numbers
         for j =1:length(Nbnoise)
             if Nbnoise(j,2) <0
                 Nbnoise(j,2)=0;
@@ -310,28 +314,46 @@ for i = 1:nsamps
     % Store the in silico data for that sample
     Ntrtstore(:,i) = Ntrt; % store N(t) data for that parameter set
     phitrtstore(:,i) = phitrt; % store phi(t) data for that parameter set
-   
+% RUN FOR ONE SAMPLE ONLY
+% %% Plot the data you're fitting to
+% figure;
+% plot(ytimefit, Ntrt, 'b*')
+% 
+% figure;
+% plot(tbot, Nbnoise(:,1), 'k-')
+% hold on
+% plot(tbot, Nbnoise(:,2), 'g-')
+% plot(tbot, Nbnoise(:,3), 'r-')
+% figure;
+% plot(tbot, phitrt, 'k*')
+
+
     
     % Now fit your in silico data using both Ntrt and phitrt
     % first fit Ntrt
     gtot = puntfit(i,1);
     carcapfit = puntfit(i,2);
     % change the set and fit values
-    pset = [phi0, carcapfit, dr];
-    rrguess = rrf;
+    pset = [phi0, carcapfit, carcap2];
     rstar = phi0/(1-phi0);
-    rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
-    alphaguess = alphaf;
-    dsguess = dsf;
-    theta = [rsguess, alphaguess, rrguess, dsguess];
-    
+    zrguess = 0.2;
+    rsguess =  0.03;
+    alphaguess = 0.0035;
+    dsguess = 0.001;
+    zdguess = 0.1;
+    theta = [rsguess, alphaguess, zrguess, dsguess, zdguess];
+
     %Give this function both Ntrt and phitrt
     % can toggle the amount that we weigh each portion..
     % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
     lambda = 0.5;
+    % This function internally instead of actually fitting rr and dr, fits the ratio 
  
-   [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
-                                    
+   [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N2(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
+     % Adjust transformed parameter estimates so we capture estimated value
+     % of rr and dr (since these are what we saved). 
+    pbestf(3) = pbestf(1)*pbestf(3); %rr= zr*rs
+     pbestf(5) = pbestf(4)*pbestf(5); %dr = zd*dr
     pfittrt(i,:) = pbestf;
     Nfittrt(:,i) = N_model;
     phifittrt(:,i) = phi_model;
@@ -340,7 +362,7 @@ for i = 1:nsamps
     CCC_vec(i,3)=f_CCC([pfset', pbestf'], 0.05);
 end
 %%
-for i =28
+for i =1
     ind = i;
 figure;
 subplot(1,2,1)
@@ -366,6 +388,8 @@ plot(tbot, phifittrt(:,ind) - 1.96*phisigfit, 'k-')
 %plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
 xlabel ('time (hours)')
 ylabel(' \phi_{sens}(t)')
+ylim([0 1.2])
+xlim([ 0 1656])
 legend ('in silico data', '95% CI on data', 'Location', 'NorthWest')
 legend box off
 title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(ind,2)), ', CCC_{p}=', num2str(CCC_vec(ind,3))])
@@ -433,7 +457,7 @@ ylabel('Predicted \phi(t)')
 title(['\phi(t) on N(t) & \phi(t), CCC= ', num2str(CCC_phi)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 %%
-pnames = {'rs', '\alpha', 'rr', 'ds'};
+pnames = {'rs', '\alpha', 'rr', 'ds', 'dr'};
 % Calculate average percent parameter error
 param_err = 100*abs(pgiven-pfit)./pgiven;
 index = param_err == Inf;
@@ -456,7 +480,7 @@ for i = 1:nfit
     xp = linspace(min(pg), max(pg), length(pg));
     yp = xp;
 
-    subplot(1, 4, i)
+    subplot(1, 5, i)
     plot(xp,yp,'-', 'LineWidth',2)
     hold on
     plot(pg, pf, '*', 'LineWidth',2)
