@@ -10,7 +10,7 @@
 % the regularization term. 
  
 % Redo this analysis, adding in dr as a free parameters
-% We need to figure out how to ensure that dr<ds and rr<rs
+
 
 % It uses the N0s, time vectors, and error in data for weighting from the
 % actual data.
@@ -134,7 +134,7 @@ end
  end
 %% Set & store known parameters
 % Start with just one set of parameter values, so o
-nsamps = 1;
+nsamps = 100;
 
 % Make your parameter domains vary by +/- 20% of the current fitted 231
 % vals

@@ -1,4 +1,4 @@
-function [pbest,model_N, model_phi, negLL] = fit_fxn_Greenephi_N2(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
+function [pbest,model_N, model_phi, negLL, err_N, err_phi] = fit_fxn_Greenephi_N2(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD,                      (Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % This function needs to redoes the fit by searching for the optimal zr and
 % zd which are the ratios of rr/rs and dr/ds respectively
@@ -46,6 +46,10 @@ P = num2cell(params);
 % bound between 0 and 1 (3&5)
 % for number of variables in pfit
 nfit = length(pfit);
+
+% This needs to be generalizable based on the psetID and pfitID
+% or we could just add an additional input to the function that is ikeep,
+% and ikeep will act to reduce these vectors of 1s and 0s
 pfxform = @(pval)[1 1 0 1 0].*log(pval)+[0 0 1 0 1].*log(pval./(1-pval)); %'forward' parameter transform into Reals
 pbxform = @(phat)[1 1 0 1 0].*exp(phat)+[0 0 1 0 1].*(exp(phat)./(1+exp(phat)));  %'backward' parameter transform into model space
 
@@ -74,6 +78,8 @@ pbest = pbxform(phatbest);
     model_N = modelfunN(pbest);
     model_phi = modelfunphi(pbest);
    negLL = objfun(phatbest);
+  err_N = (model_N-ydatafit);
+  err_phi = (model_phi-phitrt);
    
    % Try gradient descent method for finding phi
    

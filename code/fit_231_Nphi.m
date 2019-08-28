@@ -17,32 +17,29 @@ p4fit = struct2cell(p4fit);
 p4fit = cell2mat(p4fit);
 P = num2cell(p4fit);
 % Can use some of these as first guesses/ballpark ranges of what to expect
-[rsf, carcapf, alphaf, rrf, dsf, drf, k, kdrug] = deal(P{:});
+[rsf, carcapNf, alphaf, rrf, dsf, drf, k, kdrug] = deal(P{:});
 
-%% Transcribe in phi(t) data from scRNAseq
-
-Cdoxphi = 550;
-Cdoxmax = 1000;
-tgen = [0:1:1656];
-tbot = [0 1176 1656];
-Ub=k*Cdoxphi*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
-lengthvecphi = [length(tbot), length(tgen)];
-% For the carrying capacity of the scRNAseq run- this needs to change to
-% reflect the larger expansion: i.e. estimate of 100% confluence in a 15 cm
-% plate. We can just set this very high because the whole point of this
-% expansion is that cells don't reach confluence at any point...
-carcap2 =20e9;
-% CURRENT PHI(T) ESTIMATES FROM SCRNASEQ/CLASSIFIER OUTPUT
-phi0 = 0.92; 
-phitrt = [1-0.08180; 1-0.10834; 1-0.10294];
-ntrt = [ 3157; 5262; 4900]; % Use these to estimate sigma_phi
-
+% load in the scRNAseq estimates of phi(t) and the corresponding time
+% vectors from python
+phi_est_filename = '../data/phi_t_est.csv';
+phi_est = readtable(phi_est_filename);
+tbot = phi_est.t;
+phitrt = phi_est.phi_t;
+ntrt = phi_est.ncells
+sigtech = 1e-4;
+phisigfit = [phitrt.*(1-phitrt)./ntrt] + sigtech;
 N0phi = 0.8*0.24e6; % set this because this is what we think we seeded for this experiment
+phi0= phitrt(1);
 S0phi = phi0*N0phi;
 R0phi = (1-phi0)*N0phi;
-sigtech = .5e-1; % add some technical noise to sigma_phi
-phisigfit = [phitrt.*(1-phitrt)./ntrt] + sigtech;
+Cdoxphi = 550;
+Cdoxmax = 1000;
+tgen = [0:1:tbot(end)];
+Ub=k*Cdoxphi*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+lengthvecphi = [length(tbot), length(tgen)];
+carcapphi =20e6; % set this based on final outgrowth 
 
+%% Plot the phi(t) data from single cell
 figure;
 subplot(2,1,1)
 errorbar(tbot, phitrt, phisigfit/2,  'go', 'LineWidth', 4)
@@ -184,10 +181,9 @@ R0 = N0unt*(1-phi0);
 % gtot is not a parameter we set, so dont include this when comparing
 % parameter error but fine to keep track of it.
 gtot = punt(1);
-carcap1 = punt(2);
+carcapN = punt(2);
 
-  
-%%
+% Plot the fit
 figure;
 plot(ytimeunt, Nunt, '*')
 hold on
@@ -201,10 +197,10 @@ legend ('untreated data', 'model fit', '95% CI on data', 'Location', 'NorthWest'
 legend box off
 title ('Fit to untreated control  data')
 set(gca,'FontSize',20,'LineWidth',1.5)
-%% Generate dosed data and fit it using puntfit
+%% Compile dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
 % Change pset to only phi0 and carcap
-psetID = [1, 3, 4];
+psetID = [1, 3, 4]; % phi0, carcapN, carcapphi
 pfitID = [2, 5, 6, 7, 8]; % corresponds to rs, alpha, rr, ds, dr
 % Get what we need from real data
 sigmafit = [];
@@ -225,22 +221,22 @@ Uvec = vertcat(Uvec, trajsum(i).U');
 end
 lengthvec = horzcat(lengtht, lengthU);
 %% Now fit your in  data using both Ntrt and phitrt
-pset = [phi0, carcap1, carcap2];
+pset = [phi0, carcapN, carcapphi];
 rstar = phi0/(1-phi0);
 zrguess = 0.2;
 rsguess =  gtot;
-alphaguess = 0.15;
+alphaguess = 0.015;
 dsguess = 0.015;
 zdguess = 0.1;
 theta = [rsguess, alphaguess, zrguess, dsguess, zdguess];
 %rs, zr, alpha, ds, and zd
-pbounds = [0,1; 0,1; 0,1; 0,1; 0,1]; 
+pbounds = [0,5*gtot; 0,1; 0,1; 0,1; 0,1]; 
 %Give this function both Ntrt and phitrt
 % can toggle the amount that we weigh each portion..
 % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
-lambda = 0.999;
+lambda = 0.9;
 % This function internally instead of actually fitting rr and dr, fits the ratio 
-[pbest,N_model, phi_model, negLL] = fit_fxn_Greenephi_N2(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
+[pbest,N_model, phi_model, negLL, err_N, err_phi] = fit_fxn_Greenephi_N2(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % Adjust transformed parameter estimates so we capture estimated value
 % of rr and dr (since these are what we saved). 
 rr = pbest(1)*pbest(3) %rr= zr*rs
@@ -248,34 +244,35 @@ dr = pbest(4)*pbest(5) %dr = zd*dr
 rs = pbest(1)
 alpha = pbest(2)
 ds = pbest(4)
-
+% Simulate the phi(t) trajectory from all time points
+phi_model_long = simmodelgreenephi2(pbest, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
 
 CCC_vec(1) = f_CCC([N_model, ydatafit], 0.05)
 CCC_vec(2) = f_CCC([phi_model, phitrt], 0.05)
 
-%% Plot fitting results
+%% Plot first pass fitting results with an arbitrary lambda
 
 figure;
 subplot(1,2,1)
-plot(ytimefit, ydatafit, 'b*', 'LineWidth',2)
+errorbar(ytimefit, ydatafit, 1.96*sigmafit/2, 'b*')
 hold on
-plot(ytimefit, N_model, 'ko', 'LineWidth',1)
-plot(ytimefit, ydatafit+1.96*sigmafit, 'b.')
-plot(ytimefit, ydatafit-1.96*sigmafit, 'b.')
+plot(ytimefit, N_model, 'k.', 'LineWidth',1)
+%plot(ytimefit, ydatafit-1.96*sigmafit, 'b.')
 %text(ytimeunt(20), Nfitunt(20,ind), ['CCC_{Ntrt}=', num2str(CCC_Ntrt(ind)),', CCC_{pfit}=', num2str(CCC_ptrt(ind))])
 xlabel ('time (hours)')
 ylabel(' N(t)')
-legend ('N(t) data', 'model fit', '95% CI on data', 'Location', 'NorthWest')
+legend ( 'N(t) data & 95% CI','model fit', 'Location', 'NorthWest')
 legend box off
 title (['N(t), CCC_{N}=', num2str(CCC_vec(1))])
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
-plot(tbot, phitrt, 'g*', 'LineWidth',2)
+%plot(tbot, phitrt, 'g*', 'LineWidth',5)
 hold on
-plot(tbot, phi_model,'ko', 'LineWidth',1)
-plot(tbot, phitrt + 1.96*phisigfit, 'k-')
-plot(tbot, phitrt - 1.96*phisigfit, 'k-')
+errorbar(tbot, phitrt, phisigfit/2,  'go', 'LineWidth', 4)
+plot(tgen, phi_model_long,'k-', 'LineWidth',1)
+%plot(tbot, phitrt + 1.96*phisigfit, 'k.')
+%plot(tbot, phitrt - 1.96*phisigfit, 'k.')
 %plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
 xlabel ('time (hours)')
 ylabel(' \phi_{sens}(t)')
@@ -286,4 +283,35 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 ylim([0 1.5])
 xlim([0 1656])
 %pause
+%% Now we want to find the pareto surface by fitting at different values of lambda
+% at each lambda capture the error in N(t) and phi(t) and plot for
+% different values of lambda. 
 
+lambdavec = linspace(1e-4, 1-(1e-4), 100);
+
+for i = 1:length(lambdavec)
+    lambdai = lambdavec(i);
+    [pbesti(:,i),N_modeli(:,i), phi_modeli(:,i), negLLi(:,i), err_Ni, err_phii] = fit_fxn_Greenephi_N2(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambdai, pbounds);
+    sumsqerrN(i) =sum(err_Ni.^2);
+    sumsqerrphi(i) = sum(err_phii.^2);
+end
+%% Plot error in N vs. error in phi
+figure;
+plot(sumsqerrphi, sumsqerrN, 'ro', 'LineWidth', 2)
+xlabel('sum squared error in \phi(t)')
+ylabel('sum squared error in N(t)')
+set(gca,'FontSize',20,'LineWidth',1.5)%, 'Xscale', 'log', 'Yscale', 'log')
+xlim([ 1e-9 2e-4])
+ylim([ 4e9 9e9])
+title('Pareto Optimality')
+
+% Next up-- how do we find the optimal value along this curve? And once we
+% do that, how do we set lambda accordingly?
+% Probably need to do some literature digging for this...
+%% Profile likelihood analysis
+
+
+% We are going to write a function that performs the profile likelihood
+% analysis by iterating through the pbest, setting that value (using your
+% psetID and changing pset), letting all the other parameters float, and
+% finding the best fitting parameters and the 
