@@ -46,7 +46,7 @@ traj = struct(  'time', zeros(size,1), 'rawN', zeros(size,1), 'N0true', zeros(si
                 'welllabel', strings(size,1), 'well', strings(size,1), 'column', strings(size,1), ...
                 'dose', zeros(size,1), 'prevdose', zeros(size,1), 'accdose', zeros(size,1), ...
                 'dosenum', zeros(size,1), 'numdoses', zeros(size,1), ...
-                'doseints', zeros(size,1), 'WPT', zeros(size,1));
+                'doseints', zeros(size,1), 'doseintdays', zeros(size,1), 'WPT', zeros(size,1));
 for i = 1:length(raw) %each data set runs
     if i == 1
         x = 1;
@@ -685,11 +685,12 @@ for i = 1:length(raw) %each data set runs
             end                        
         end
         traj(j).accdose = traj(j).dose + sum(traj(j).prevdose);
+        traj(j).doseintdays = traj(j).doseints * 7 - 1;
     end
 end
 %% random sorting stuff
-%T = struct2table(traj); % converts traj to a table
-%sortedT = sortrows(T, 'N0true'); % sort the table by '(field)'
+T = struct2table(traj); % converts traj to a table
+sortedT = sortrows(T, 'numdoses'); % sort the table by '(field)'
 % check "sortedT"
 %% Add color by WPT 
 for j = 1:length(traj)

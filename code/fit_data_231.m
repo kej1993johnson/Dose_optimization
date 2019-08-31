@@ -174,7 +174,7 @@ for i = 1:length(traj)
         xlabel('Concentration Dox','FontSize',20)
         ylabel('t_{crit}','FontSize',20)
         set(gca,'FontSize',20,'LineWidth',1.5)
-        title('Dox Concentration vs. Critical time')
+        title('Dox Concentration vs. t_{crit}')
         hold on
         end
     end

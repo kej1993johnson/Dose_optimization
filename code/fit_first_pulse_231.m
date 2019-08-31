@@ -363,7 +363,7 @@ p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
  end
  %% Save calibrated parameters from 231s with 4 doses 25-150 nM
  
-p4fit= [rs, carcap, alpha, rr, ds, dr, k ,kdrug];
+p4fit= [rs, carcap, alpha, rr, ds, dr, k ,kdrug, gtot];
 save('../out/p4fit231', 'p4fit')
 % Save trajsum
 %p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
