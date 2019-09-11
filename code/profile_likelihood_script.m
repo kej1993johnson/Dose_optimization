@@ -10,9 +10,9 @@ rr_to_pop_ratio= 0.0317/0.0392;
 rrdata = rr_to_pop_ratio*gtot
 pset = [phi0, carcapNf, carcapphi, rrdata];
 %%
-nfitparams = length(psetID);
+nfitparams = length(pfitID);
         profile = [];
-factor = 0.5;
+factor = 0.2;
 numpoints = 10;
 params = pbest; % rs, alpha, zr, ds, zd];
 
@@ -43,10 +43,10 @@ profindex = pfitID(k); % PROFILE the kth fit parameter
         % parameters not being profiled
         pfitIDcurr = pfitID(ikeep);
         thetacurr = pbest(ikeep);
-        pboundscurr = pbounds(ikeep);
+        pboundscurr = pbounds(ikeep, :);
         pcomb = [pset, currp];
         psetcurr = pcomb(ordp);
-        [paramstemp,~, ~, fvaltemp, ~, ~]=fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitIDcurr, psetIDcurr, thetacurr, psetcurr, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pboundscurr, ikeep);
+        [paramstemp,~, ~, fvaltemp, ~, ~]=fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitIDcurr, psetIDcurr, thetacurr, psetcurr, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pboundscurr);
         
         %[fvaltemp, paramstemp] = ML_fitnegLL(params, tsamp, N0, N, mudatavec, vardatavec, modelcode, profindex, currp);
         % fminsearch will out put the values of dguess that give the lowest
@@ -84,7 +84,7 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 title(rs)
 %% Plot the profiles
 %plist = {'r_{s}', '\alpha', 'r_{ratio}', 'd_{s}', 'd_{ratio}'};
-plist = {'r_{s}', '\alpha', 'd_{s}', 'd_{r}/d_{s} ratio'};
+plist = {'\phi_{0}','r_{s}', 'r_{r}/r_{s} ratio', '\alpha', 'd_{s}', 'd_{r}/d_{s} ratio'};
 threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
 figure;
 for i = 1:length(pbest)

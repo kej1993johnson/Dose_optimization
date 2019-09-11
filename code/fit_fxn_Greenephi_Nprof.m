@@ -1,4 +1,4 @@
-function [pbest,model_N, model_phi, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds, ikeep) 
+function [pbest,model_N, model_phi, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD,                      (Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % This function needs to redoes the fit by searching for the optimal zr and
 % zd which are the ratios of rr/rs and dr/ds respectively
@@ -50,10 +50,6 @@ nfit = length(pfit);
 % This needs to be generalizable based on the psetID and pfitID
 % or we could just add an additional input to the function that is ikeep,
 % and ikeep will act to reduce these vectors of 1s and 0s
-vec1 = [0 0 0 0 0];
-vec2 = [1 1 1 1 1];
-vec1curr = vec1(ikeep);
-vec2curr = vec2(ikeep);
 pfxform = @(pval)log(pval);%+vec2curr.*log(pval./(1-pval)); %'forward' parameter transform into Reals
 pbxform = @(phat)exp(phat);%+vec2curr.*(exp(phat)./(1+exp(phat)));  %'backward' parameter transform into model space
 
@@ -74,6 +70,7 @@ loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-y
 objfun=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
 LB = pfxform(pbounds(:,1)');
 UB = pfxform(pbounds(:,2)');
+
 phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
 pbest = pbxform(phatbest);
 

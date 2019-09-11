@@ -42,11 +42,12 @@ phi_est = readtable(phi_est_filename);
 tbot = phi_est.t;
 phitrt = phi_est.phi_t;
 tscRNAseq = tbot(end);
+ntrt = phi_est.ncells;
 
 %% Plot the average data for the set of controls (u(t)s) we want to use
   figure;
- for i = 1:length(trajsum)-4
-     subplot(2,1,1)
+ for i = 1:length(trajsum)-5
+     subplot(2,1,2)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
          text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
@@ -54,18 +55,34 @@ tscRNAseq = tbot(end);
          plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
         xlabel('time (hours)')
         ylabel('N(t)')
-        title('N(t) for different single pulse treatments')
+        title('N(t)')
+        set(gca,'FontSize',20,'LineWidth',1.5)
         dt = 1;
-       subplot(2,1,2)
+       subplot(2,1,1)
        ttest = [];
        ttest = 0:dt:trajsum(i).tvec(end);
        plot(ttest, trajsum(i).U,'.', 'color',trajsum(i).color, 'LineWidth',1)
         hold on
         xlabel('time (hours)')
         ylabel('Effective dose U(t)')
-        title('U(t) for different single pulse treatments')
+        title('U(t)')
+        set(gca,'FontSize',20,'LineWidth',1.5)
  end
-
+ %% Plot experimental data of phi(t)
+ sigtech = 1e-1;
+phisigfit = [phitrt.*(1-phitrt)./ntrt] + sigtech;
+figure;
+errorbar(tbot, phitrt, phisigfit, 'g*', 'LineWidth', 3)
+hold on
+errorbar(tbot, 1-phitrt, phisigfit, 'r*', 'LineWidth', 3)
+legend('\phi_{sens}(t)', '\phi_{res}(t)', 'Location', 'Northwest')
+legend('boxoff')
+ylim([-.1, 1.1])
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('time (hours)')
+ylabel('\phi(t)')
+xlim([-50,tscRNAseq+50]) 
+%title('Phenotypic composition estimates from scRNAseq')
 %% Run loop to generate output needed from each control u(t)
 % If we want to output the effect of individual parameter changes on the
 % "model behavior" and we quantify model behavior as some observable
@@ -140,17 +157,50 @@ figure;
 subplot(1,2,1)
 plot(Cdoxvec, tcrit1, 'b-', 'LineWidth', 2)
 set(gca,'FontSize',20,'LineWidth',1.5)
-xlabel('Dox concentration')
-ylabel('Time to reach 2N_{0}')
-title('Dox vs. t_{crit}')
+xlabel('[Dox]')
+ylabel('t_{crit}')
+title('t_{crit}')
 xlim([0 Cdoxvec(end)])
 subplot(1,2,2)
 plot(Cdoxvec, phi_sc, 'm-', 'LineWidth', 2)
 set(gca,'FontSize',20,'LineWidth',1.5)
-xlabel('Dox concentration')
-ylabel('\phi_{s} at time of scRNAseq (10 weeks)')
-title('Dox vs. \phi_{s} @ 10 weeks')
+xlabel('[Dox]')
+ylabel('\phi_{s}')
+title('\phi_{s} @ 10 weeks')
 xlim([0 Cdoxvec(end)])
+%% Plot some example trajectories
+
+rs = 0.01;
+rr = 0.005;
+ds = 0.04;
+dr = 0;
+alpha = 0.001;
+pex = [0.8, carcapNf, rs, alpha, 0.5, ds, 0.1];
+[Nsrdat, tcrit, Ncrit]=fwd_Greene_model2(pex, tvec1, N0, U1(:,16), dt,tdrug);
+
+figure;
+plot(tvec1, Nsrdat(:,1), 'b', 'LineWidth', 4)
+hold on
+plot(tvec1,Nsrdat(:,2), 'g--', 'LineWidth', 2)
+plot(tvec1, Nsrdat(:,3), 'r--', 'LineWidth',2)
+legend('N(t)', 'S(t)', 'R(t)', 'Location', 'Northwest')
+legend boxoff
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('time (hours)')
+ylabel('N(t)')
+xlim([0, tvec1(end)])
+
+figure;
+plot(tvec1, (Nsrdat(:,2)./Nsrdat(:,1)), 'g', 'LineWidth', 4)
+hold on
+plot(tvec1, (Nsrdat(:,3)./Nsrdat(:,1)), 'r', 'LineWidth',4)
+legend('\phi_{sens}(t)', '\phi_{res}(t)', 'Location', 'Northwest')
+legend boxoff
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('time (hours)')
+ylabel('\phi(t)')
+xlim([0, tvec1(end)])
+
 %% Perform a local sensitivity analysis
 % tornado_plot of sensitivities of model at the default values for other parameters
  

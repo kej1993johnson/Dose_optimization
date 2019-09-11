@@ -19,15 +19,16 @@ P = num2cell(p4fit);
 % Can use some of these as first guesses/ballpark ranges of what to expect
 [rsf, carcapNf, alphaf, rrf, dsf, drf, k, kdrugi, gtot] = deal(P{:});
 % We will use this carcapNf only, and the k and kdrug to be consistent
-kdrug = kdrugi; % make the drug last longer
+kdrug = kdrugi*0.75; % make the drug last longer
 % load in the scRNAseq estimates of phi(t) and the corresponding time
 % vectors from python
-phi_est_filename = '../data/phi_t_est.csv';
+
+phi_est_filename = '../data/phi_t_est_pyth.csv';
 phi_est = readtable(phi_est_filename);
 tbot = phi_est.t;
 phitrt = phi_est.phi_t;
 ntrt = phi_est.ncells;
-sigtech = 1e-1;
+sigtech = 1e-4;
 phisigfit = [phitrt.*(1-phitrt)./ntrt] + sigtech;
 N0phi = 0.8*0.24e6; % set this because this is what we think we seeded for this experiment
 phi0= phitrt(1);
@@ -144,7 +145,7 @@ for i = 1:length(trajsum)
 end
 % Plot the average data 
   figure;
- for i = 1:6%length(trajsum)
+ for i = 1:length(trajsum)
      subplot(2,1,1)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
@@ -169,10 +170,9 @@ save('../out/trajsumfit231.mat', 'trajsum')
 %% Compile dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
 % Change pset to only phi0 and carcap
-psetID = [1, 3, 4, 6]; % phi0, carcapN, carcapphi
-pfitID = [2, 5, 7, 8]; % corresponds to rs, alpha, rr, ds, dr
-ikeep = true(5, 1)
-ikeep(3)=false
+psetID = [ 1, 3, 4]; % phi0, carcapN, carcapphi
+pfitID = [ 2, 5, 6, 7, 8]; % corresponds to phi0, rs, alpha, rr, ds, dr
+
 % Get what we need from real data
 sigmafit = [];
 ytimefit = [];
@@ -181,7 +181,9 @@ N0s = [];
 lengtht = [];
 lengthU = [];
 Uvec = [];
-for i = 1:length(trajsum)-6
+dosevec = [ 1, 4, 7, 9];
+for j=1:length(dosevec)
+    i = dosevec(j);
 sigmafit = vertcat(sigmafit,trajsum(i).Nstd(1:end));
 ytimefit = vertcat(ytimefit, trajsum(i).tvec(1:end));
 ydatafit = vertcat(ydatafit, trajsum(i).Nmean(1:end));
@@ -197,32 +199,36 @@ lengthvec = horzcat(lengtht, lengthU);
 % also set or just bound ds or dr
 rr_to_pop_ratio= 0.03/0.0392;
 zrdata = rr_to_pop_ratio;
-pset = [phi0, carcapNf, carcapphi, zrdata];
+zddata = 0.1;
+%pset = [phi0, carcapNf, carcapphi, zrdata];
+pset = [phi0, carcapNf, carcapphi];
 rstar = phi0/(1-phi0);
 zrguess = 0.4;
-rsguess =  1.3*gtot;
+rsguess =  1.8*gtot;
 alphaguess = 0.1;
 dsguess = 0.04;
-zdguess = 0.01;
-theta = [rsguess, alphaguess, dsguess, zdguess];
+zdguess = 0.1;
+theta = [rsguess, zrguess, alphaguess, dsguess, zdguess];
 
-%rs, alpha, zr, ds, and zd
+%phi0, rs, alpha, zr, ds, and zd
 % Unfortunately it appears that the 
-pbounds =  [0.9*gtot, 1; 0,2 ; 0,1; 0,1]; 
+pbounds =  [ 0.5*gtot, 2; 0,1; 0,2; 0.0,0.1; 0,1]; 
 %Give this function both Ntrt and phitrt
 % can toggle the amount that we weigh each portion..
 % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
-lambda = 0.9999;
+lambda = 0.1;
 % This function internally instead of actually fitting rr and dr, fits the ratio 
-[pbest,N_model, phi_model, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds, ikeep);
+[pbest,N_model, phi_model, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % Adjust transformed parameter estimates so we capture estimated value
-% of rr and dr (since these are what we saved). 
-zd=pbest(4);
-dr = pbest(3)*pbest(4);%dr = ds*zd
-rs = pbest(1)
-rr = rs*zrdata
+% of rr and dr (since these are what we saved).
+rs =pbest(1);
 alpha = pbest(2);
-ds = pbest(3);
+zr = pbest(3);
+rr = rs*zr;
+ds = pbest(4);
+zd = pbest(5);
+dr = ds*zd;
+
 % Simulate the phi(t) trajectory from all time points
 phi_model_long = simmodelgreenephi2(pbest, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
 
@@ -231,7 +237,7 @@ CCC_vec(2) = f_CCC([phi_model, phitrt], 0.05);
 fvalbest = negLL
 pbest = pbest
 
-psave = [phi0, carcapNf, carcapphi, rs, alpha, zrdata, ds, zd, k, kdrug, gtot];
+psave = [phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot];
 save('../out/ptest.mat', 'psave')
 %% Plot first pass fitting results with an arbitrary lambda
 
@@ -270,22 +276,38 @@ xlim([0 1656])
 % at each lambda capture the error in N(t) and phi(t) and plot for
 % different values of lambda. 
 
-lambdavec = linspace(1e-4, 1-(1e-4), 100);
-
+lambdavec = linspace(1e-6, 1, 100);
+pboundsprof = [0, Inf; 0, Inf; 0, Inf; 0, Inf; 0, Inf];
 for i = 1:length(lambdavec)
     lambdai = lambdavec(i);
-    [pbesti(:,i),N_modeli(:,i), phi_modeli(:,i), negLLi(:,i), err_Ni, err_phii] = fit_fxn_Greenephi_N2(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambdai, pbounds);
+    [pbesti(:,i),N_modeli(:,i), phi_modeli(:,i), negLLi(:,i), err_Ni, err_phii] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambdai, pbounds);
     sumsqerrN(i) =sum(err_Ni.^2);
     sumsqerrphi(i) = sum(err_phii.^2);
+end
+%%
+pareto = horzcat(sumsqerrphi', sumsqerrN', pbesti')
+save('../out/pareto.mat', 'pareto')
+
+%%
+figure;
+for i = 1:length(pbest)
+    plot(lambdavec, pbesti(i,:), '-')
+    hold on
+    ylim([0, 2])
+    xlim([lambdavec(1), lambdavec(end)])
+    xlabel('\lambda')
+    ylabel('parameter value')
+    legend('rs', 'zr', '\alpha', 'ds', 'zd');
+    set(gca,'FontSize',20,'LineWidth',1.5)
 end
 %% Plot error in N vs. error in phi
 figure;
 plot(sumsqerrphi, sumsqerrN, 'ro', 'LineWidth', 2)
 xlabel('sum squared error in \phi(t)')
 ylabel('sum squared error in N(t)')
-set(gca,'FontSize',20,'LineWidth',1.5)%, 'Xscale', 'log', 'Yscale', 'log')
-xlim([ 1e-9 2e-4])
-ylim([ 4e9 9e9])
+set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
+%xlim([ 1e-4 1e-2])
+%ylim([ 1e11 1e12])
 title('Pareto Optimality')
 
 % Next up-- how do we find the optimal value along this curve? And once we
