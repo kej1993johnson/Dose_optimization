@@ -19,13 +19,24 @@ ptest = struct2cell(ptest);
 ptest = cell2mat(ptest);
 P = num2cell(ptest);
 
-[phi0, carcapNf, carcapphi, rs, alpha, zrdata, ds, zd, k, kdrug, gtot] = deal(P{:});
+% Also don't really need the confidence intervals
+CI = load('../out/CIpbest.mat');
+CI = struct2cell(CI);
+CI = cell2mat(CI);
+CIphi0 = CI(1,:);
+CIrs = CI(2,:);
+CIalpha = CI(3,:);
+CIzr = CI(4,:);
+CIds = CI(5,:);
+CIzd=CI(6,:);
 
-%% Run this forward for a single pulse treatment at 75 nM 
+[phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot] = deal(P{:});
+
+%% Run this forward for a single pulse treatment at 200 nM 
 % Again, assume R0=0; dr = 0 and
 
 
-% Pull from trajsum dose = 75
+% Pull from trajsum dose = 200
 for i = 1:length(trajsum)
     if trajsum(i).Cdox == 200
         tvec = trajsum(i).tvec;
@@ -35,7 +46,7 @@ for i = 1:length(trajsum)
     end
 end
 
-p = [ phi0, carcapNf,rs,alpha, zrdata, ds, zd];
+p = [ phi0, carcapNf,rs,alpha, zr, ds, zd];
 tlong = 0:4:1344;
 dt = 1;
 tdrug = 1;
@@ -56,7 +67,7 @@ plot(tvec, Nmean + Nstd, 'color', 'k')
 plot(tvec, Nmean - Nstd, 'color', 'k')
 xlabel ('time (hours)')
 ylabel ('N(t)')
-title('N(t) for single 150 nM pulse treatment')
+title('N(t) for single 200 nM pulse treatment')
 legend ('data mean', 'model', 'Location', 'NorthWest')
 legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
@@ -73,9 +84,10 @@ plot(tlong, Nsri(:,2), 'g','LineWidth',2)
 plot(tlong, Nsri(:,3),'r', 'LineWidth',2)
 text(tlong(2), Nsri(2,2),['\phi_{sens_i}=', num2str(1)])
 text(tlong(end-20), Nsri(end-20,2),['\phi_{sens_f}=', num2str(fracSens)])
+xlim([ 0 384])
 xlabel ('time (hours)')
 ylabel ('N(t)')
-title('S(t) & R(t)for single 150 nM pulse treatment')
+title('S(t) & R(t)for single 200 nM pulse treatment')
 legend ('N data', 'Upper bound', 'Lower bound','N(t)', 'S(t)','R(t)', 'Location', 'NorthWest')
 legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
@@ -96,9 +108,9 @@ plot(tlong(end-100), resfrac_t(end-100), 'k*', 'LineWidth',5)
 % text(tvec(504), resfrac_t(504), ['\phi_{res_t=3WPT}=', num2str(resfrac_t(504))], 'FontSize', 14)
 % plot(tvec(504), sensfrac_t(504), 'k*', 'LineWidth',5)
 % plot(tvec(504), resfrac_t(504), 'k*', 'LineWidth',5)
-xlim([ 0 tlong(end)])
+xlim([ 0 384])
 ylabel ('Proportion of cells')
-title('\phi_{S} & \phi_{R} following single 75 nM pulse treatment')
+title('\phi_{S} & \phi_{R} following single 200 nM pulse treatment')
 % legend ( '\phi_{S}','\phi_{R}', 'Location', 'NorthWest')
 % legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
@@ -112,67 +124,206 @@ dose = 200;
 date = '';
 [traj2] = comb_data_fxn(traj, filter_criteria, ntreat, dose, date)
 
+
+
+
 %% Write a function to find phi at a certain time
 % If repeat dose is within the time frame measured in the first pusle
 % treatment
-repeat_trts = 1:1:8;
+repeat_trts = [ 4 6 8 10 ]; % days at which the treatment was repeated
   Cdox = 200;
+  Cdoxmax = 1000;
 figure;
 for i = 1:length(repeat_trts)
    % Find the Number of sensitive and resisitant cells predicted at start
    % of second treatment
-    tdose = repeat_trts(i)*24*7;
+    tdose = repeat_trts(i)*24;
     tfirst = 0:1:tdose;
-    [Nsri, tcrit, Ncrit] = fwd_Greene_model2(p, tfirst, N0, U1, dt, tdrug);
-    ind = find(ismember(tfirst, tdose), 1, 'first');
-    fracS(i)= Nsri(ind,2)/Nsri(ind,1);
-    % Set the initial number of the total cells and the sensitive and
-    % resistant cells at the time of repeat treatment
+    tsecond = 0:1:336; % monitor for two weeks after
+    tdrug = [0; tdose];
+    ttot = horzcat(tfirst, tsecond(2:end) + tfirst(end));
+    U1=k*Cdox*exp(-kdrug*(tfirst))/(0.1*Cdoxmax);
+    U2=k*Cdox*exp(-kdrug*(tsecond))/(0.1*Cdoxmax);
+    U = horzcat(U1(1:end-1), U2);
+    % Run the model forward for the two different U(t)s and times of drug
+    % for each variest treatment interval
+    [Nsri, tcrit, Ncrit] = fwd_Greene_model2(p, ttot, N0, U, dt, tdrug);
     
-    N01(1,i) = N0; % lets say that we simulated reseeding the same number of cells
-    % as the first treatment
-    % We assume the proportion of sensitive and resistant cells remains the
-    % same
-    
-% Simulate second dose 
-    tfin = 672; % this is how long we want to monitor the repeat dose (about 5 weeks)
-    tvec2 = 0:dt:tfin;
-    U2=k*Cdox*exp(-kdrug*(tvec2))/(0.1*Cdoxmax);
-    tdrug = 1; % only simulating one dose)
-    % all parameters are the same except now we have a different proportion
-    % of sensitive and resistant cells
-    p2 = [fracS(i), p(2:end)];
-    [Nsr2(:,:,i), tcrit2(i), Ncrit2] = fwd_Greene_model2(p2, tvec2, N0, U2, dt, tdrug);
-    Nmodpred = Nsr2(:,:,i);
-    tvecmod = tvec2;
-
-
-
 
 subplot(2, length(repeat_trts)/2, i)
 
     hold on
-    plot (tvecmod, Nmodpred(:,1),'b-' ,'LineWidth',2)
-    plot(tvecmod, Nmodpred(:,2), 'g-', 'LineWidth',2)
-    plot(tvecmod, Nmodpred(:,3), 'r-', 'LineWidth', 2)
-    title (['WPT=', num2str(repeat_trts(i))])
+    plot (ttot, Nsri(:,1),'b-' ,'LineWidth',2)
+    plot(ttot, Nsri(:,2), 'g-', 'LineWidth',2)
+    plot(ttot, Nsri(:,3), 'r-', 'LineWidth', 2)
+    plot(tvec, Nmean,'k.', 'LineWidth', 2)
+    %plot(tvec, Nmean + Nstd, 'color', 'k')
+    %plot(tvec, Nmean - Nstd, 'color', 'k')
+    title (['Treatment Interval=', num2str(repeat_trts(i)), ' days'])
     xlabel ('time (hours)')
     ylabel ('N(t)')
-    title(['WPT=', num2str(repeat_trts(i))])
-    legend ('N(t)', 'S(t)', 'R(t)', 'Location', 'NorthWest')
+    legend ('N(t)', 'S(t)', 'R(t)','N(t) data', '95% CI', 'Location', 'NorthWest')
     legend boxoff
     set(gca,'FontSize',20,'LineWidth',1.5)
-    xlim([0 tfin])
-    ylim([0 4e4])
+    xlim([0 ttot(end)])
+    ylim([0 0.7*carcapNf])
 end
+
+%% Repeat this but add in a cone of uncertainty around N...
+
+% Set the upper bound parameters
+%p = [ phi0, carcapNf,rs,alpha, zrdata, ds, zd];
+sigtech = 1e-2;
+% Combine all the parameters that should lead to a lower response...
+pup = [CIphi0(1), carcapNf, CIrs(2), CIalpha(2), CIzr(2), CIds(1), CIzd(1)];
+plow = [CIphi0(2), carcapNf, CIrs(1), CIalpha(1), CIzr(1), CIds(2), CIzd(2)];
+%
+
+repeat_trts = [4 6 8 10]; % days at which the treatment was repeated
+  Cdox = 200;
+  Cdoxmax = 1000;
+figure;
+for i = 1:length(repeat_trts)
+   % Find the Number of sensitive and resisitant cells predicted at start
+   % of second treatment
+    tdose = repeat_trts(i)*24;
+    tfirst = 0:1:tdose;
+    tsecond = 0:1:336; % monitor for two weeks after
+    tdrug = [0; tdose];
+    ttot = horzcat(tfirst, tsecond(2:end) + tfirst(end));
+    U1=k*Cdox*exp(-kdrug*(tfirst))/(0.1*Cdoxmax);
+    U2=k*Cdox*exp(-kdrug*(tsecond))/(0.1*Cdoxmax);
+    U = horzcat(U1(1:end-1), U2);
+    % Run the model forward for the two different U(t)s and times of drug
+    % for each variest treatment interval
+    [Nsri, tcrit, Ncrit] = fwd_Greene_model2(p, ttot, N0, U, dt, tdrug);
+    % Now simulate upper and lower bounds from parameter estimates
+    [Nsrlow, tcritl, Ncritl] = fwd_Greene_model2(plow, ttot, N0, U, dt, tdrug);
+    [Nsrhigh, tcrith, Ncrith] = fwd_Greene_model2(pup, ttot, N0, U, dt, tdrug);
+subplot(2, length(repeat_trts)/2, i)
+
+    hold on
+    plot(ttot, Nsri(:,1),'b-' ,'LineWidth',2)
+    plot(ttot, Nsri(:,2),'g-' ,'LineWidth',2)
+    plot(ttot, Nsri(:,3),'r-' ,'LineWidth',2)
+    
+    plot(ttot, Nsrlow(:,1), 'b--', 'LineWidth',1)
+    plot(ttot, Nsrhigh(:,1), 'b--', 'LineWidth', 1)
+    
+%     plot(ttot, Nsrlow(:,2), 'g--', 'LineWidth',1)
+%     plot(ttot, Nsrhigh(:,2), 'g--', 'LineWidth',1)
+%     
+%     plot(ttot, Nsrlow(:,3), 'r--', 'LineWidth',1)
+%     plot(ttot, Nsrhigh(:,3), 'r--', 'LineWidth',1)
+%     
+    
+    title (['Treatment Interval=', num2str(repeat_trts(i)), ' days'])
+    xlabel ('time (hours)')
+    ylabel ('N(t)')
+    legend ('N(t)', 'lower N(t)', 'upper N(t)','N(t) data', '95% CI', 'Location', 'NorthWest')
+    legend boxoff
+    set(gca,'FontSize',20,'LineWidth',1.5)
+    xlim([0 ttot(end)])
+    %ylim([0 carcapNf])
+    ylim([0 0.7*carcapNf])
+end
+figure;
+plot(ttot, U, '-', 'LineWidth', 2)
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('time(hours)')
+ylabel('U(t)')
+title('Repeat doses: U(t)')
+
+%% Just add uncertainty to the second treatment.
+% Need to figure out why this isnot continuous even though the one calling
+% the function is!
+figure;
+for i = 1:length(repeat_trts)
+    
+    % Simulate the first dose with the best fitting p only
+    tdose = repeat_trts(i)*24;
+    tfirst = 0:1:tdose;
+    tsecond = 0:1:336; % monitor for two weeks after
+    tdrug = [0; tdose];
+    ttot = horzcat(tfirst, tsecond(2:end) + tfirst(end));
+    U1=k*Cdox*exp(-kdrug*(tfirst))/(0.1*Cdoxmax);
+    U2=k*Cdox*exp(-kdrug*(tsecond))/(0.1*Cdoxmax);
+    U = horzcat(U1(1:end-1), U2);
+    
+    % Run the model forward for the two different U(t)s and times of drug
+    % for each variest treatment interval
+    [Nsr1, tcrit, Ncrit] = fwd_Greene_model2(p, tfirst, N0, U1(1:end-1), dt, tdrug(1));
+    
+    
+    % Now simulate the secodn treatment with
+    % upper and lower bounds from parameter estimates
+    p2 = p;
+    p2(1) = Nsr1(end,2)./Nsr1(end,1);
+    plow2 = plow;
+    plow2(1) = p2(1) + sigtech;
+    pup2 = pup;
+    pup2(1) = p2(1)-sigtech;
+    [Nsr2, tcrit, Ncrit] = fwd_Greene_model2(p2, tsecond, Nsr1(end,1), U2, dt, tdrug(1));
+    [Nsr2low, tcritl, Ncritl] = fwd_Greene_model2(plow2, tsecond, Nsr1(end,1), U2, dt, tdrug(1));
+    [Nsr2high, tcrith, Ncrith] = fwd_Greene_model2(pup2, tsecond, Nsr1(end,1), U2, dt, tdrug(1));
+   % Ntot = vertcat(Nsr1(1:end,:), Nsr2(:,:));
+    iend = find(tvec>tfirst(end), 1, 'first');
+    
+    subplot(2, length(repeat_trts)/2, i)
+
+    hold on
+    plot(tfirst, Nsr1(:,1), 'b-', 'LineWidth', 2)
+    plot(tfirst, Nsr1(:,2), 'g-', 'LineWidth', 2)
+    plot(tfirst, Nsr1(:,3), 'r-', 'LineWidth',2)
+    plot(tvec(1:iend), Nmean(1:iend),'k.', 'LineWidth', 2)
+    plot(tvec(1:iend), Nmean(1:iend) + Nstd(1:iend), 'color', 'k')
+    plot(tvec(1:iend), Nmean(1:iend) - Nstd(1:iend), 'color', 'k')
+    plot(tsecond + tfirst(end), Nsr2(:,1), 'b-', 'LineWidth',2)
+    plot(tsecond + tfirst(end), Nsr2(:,2), 'g-', 'LineWidth',2)
+    plot(tsecond + tfirst(end), Nsr2(:,3), 'r-', 'LineWidth',2)
+    plot(tsecond+tfirst(end), Nsr2low(:,1), 'b--', 'LineWidth',1)
+    plot(tsecond+tfirst(end), Nsr2high(:,1), 'b--', 'LineWidth', 1)
+    title (['Treatment Interval=', num2str(repeat_trts(i)), ' days'])
+    xlabel ('time (hours)')
+    ylabel ('N(t)')
+    legend ('N(t)', 'S(t)', 'R(t)', 'N(t) data',  'Location', 'NorthWest')
+    legend boxoff
+    set(gca,'FontSize',20,'LineWidth',1.5)
+    xlim([0 ttot(end)])
+    %ylim([0 carcapNf])
+    ylim([0 0.7*carcapNf])
+    
+end
+
+
 %%
 figure;
 for i = 1:8
     plot(tvecmod, Nsr2(:,1,i), 'LineWidth', 2)
     hold on
-    title('N(t)')
+    xlabel('time (hours)')
+    ylabel('N(t)')
+    title('N(t) for different repeat treatment intervals' )
+    xlim([0 tfin])
 end
+set(gca,'FontSize',20,'LineWidth',1.5)
+legend('1 WPT', '2 WPT', '3 WPT', '4 WPT', '5 WPT', '6 WPT', '7 WPT','8 WPT', 'Location', 'Northwest')
+legend boxoff
 
+figure;
+for i = 1:8
+    plot(tvecmod, Nsr2(:,2,i)/Nsr2(:,1,i), 'LineWidth', 2)
+    hold on
+    xlabel('time (hours)')
+    ylabel('\phi_{s}(t)')
+    title('\phi_{s}(t) for different repeat treatment intervals' )
+     xlim([0 tfin])
+end
+set(gca,'FontSize',20,'LineWidth',1.5)
+legend('1 WPT', '2 WPT', '3 WPT', '4 WPT', '5 WPT', '6 WPT', '7 WPT','8 WPT', 'Location', 'Northwest')
+legend boxoff
+
+%%
 figure;
 for i = 1:8
     plot(tvecmod, Nsr2(:,2,i), 'LineWidth', 2)
@@ -185,10 +336,4 @@ for i = 1:8
     plot(tvecmod, Nsr2(:,3,i), 'LineWidth', 2)
     hold on
     title('R(t)')
-end
-figure;
-for i = 1:8
-    plot(tvecmod, Nsr2(:,2,i)/Nsr2(:,1,i), 'LineWidth', 2)
-    hold on
-    title('\phi_{sens}(t)')
 end

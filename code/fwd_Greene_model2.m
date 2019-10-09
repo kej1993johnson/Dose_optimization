@@ -52,6 +52,7 @@ for i = 1:length(tdrug)
     ind = find(ismember(ilow, ihigh));
     Npd = N(ind);
     Ncrit(i) = 2*Npd(1);
+    %Ncrit(i) = 2*N0;
     icrit = find(Npd>Ncrit(i),1, 'first');
 
     if isempty(icrit)

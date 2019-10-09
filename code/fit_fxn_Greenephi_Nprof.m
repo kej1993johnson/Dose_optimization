@@ -1,4 +1,4 @@
-function [pbest,model_N, model_phi, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
+function [pbest,model_N, model_phi, negLL, werr_N,werr_phi] = fit_fxn_Greenephi_Nprof(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD,                      (Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % This function needs to redoes the fit by searching for the optimal zr and
 % zd which are the ratios of rr/rs and dr/ds respectively
@@ -67,20 +67,35 @@ modelfunphi = @ (p)simmodelgreenephi2(p, tbot, N0phi, pset, Ub, lengthvecphi, pf
 
 loglikelihoodphi= @(phat)sum(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
 loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit).^2);
-objfun=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
+%What if the objective function was just minimized error??
+weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
+weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2)./(phisigfit.^2));
+objfun= @(phat)((1-lambda)*weightederrN(phat) + lambda*weightederrphi(phat));
+
+objfunLL=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
 LB = pfxform(pbounds(:,1)');
 UB = pfxform(pbounds(:,2)');
-
-phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
+% This should make the search more exhaustive...
+options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e5, 'TolFun', 1e-6, 'TolX', 1e-6);
+phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB, options);
 pbest = pbxform(phatbest);
 
 
 
-    model_N = modelfunN(pbest);
-    model_phi = modelfunphi(pbest);
+   % model_N = modelfunN(pbest);
+   % model_phi = modelfunphi(pbest);
    negLL = objfun(phatbest);
-  err_N = (model_N-ydatafit);
-  err_phi = (model_phi-phitrt);
+   Nfwd = modelfunN(pbest);
+    phifwd = modelfunphi(pbest);
+    model_N = Nfwd;
+    model_phi = phifwd;
+    
+    werr_N = sum(((Nfwd-ydatafit).^2)./(sigmafit.^2));
+    werr_phi=sum(((phifwd-phitrt).^2)./(phisigfit.^2));
+    
+   
+  %werr_N = sum(((model_N-ydatafit).^2)./sigmafit);
+  %werr_phi = sum(((model_phi-phitrt).^2)./phisigfit);
    
    % Try gradient descent method for finding phi
    
