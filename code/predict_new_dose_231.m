@@ -21,6 +21,11 @@ ptest = struct2cell(ptest);
 ptest = cell2mat(ptest);
 P = num2cell(ptest);
 
+ptestN = load('../out/ptestN.mat');
+ptestN = struct2cell(ptestN);
+ptestN = cell2mat(ptestN);
+PN = num2cell(ptestN);
+
 % Also don't really need the confidence intervals
 CI = load('../out/CIpbest.mat');
 CI = struct2cell(CI);
@@ -37,11 +42,13 @@ pareto_table = readtable('../out/pbest_table.csv');
 
 
 [phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot] = deal(P{:});
+[phi0N, carcapNf, carcapphi, rsN, alphaN, zrN, dsN, zdN, k, kdrug, gtot] = deal(PN{:});
 
 %% Run this forward for a single pulse treatment at 200 nM 
 % Again, assume R0=0; dr = 0 and
 
 p = [ phi0, carcapNf,rs,alpha, zr, ds, zd];
+pN = [phi0N, carcapNf, rsN, alphaN, zrN, dsN, zdN];
 % ptest = [pareto_table.phi0vals(m), carcapNf, pareto_table.rsvals(m),...
 %     pareto_table.alphavals(m), pareto_table.rr_rs_ratio(m), pareto_table.dsvals(m),...
 %     pareto_table.dr_ds_ratio(m)];
@@ -73,12 +80,14 @@ N0 = trajsum(i).Nmean(1);
         Nsrmat = horzcat(Nsrmat,Nsri(:,1));
     end
 [Nsrmod, tcrit, Ncrit] = fwd_Greene_model2(p, trajsum(i).tvec, N0, Udata, dt, tdrug);
+[NsrN, tcrot, Ncrit] = fwd_Greene_model2(pN, trajsum(i).tvec, N0, Udata, dt, tdrug);
 [Nsrlow, tcrit, Ncritl] = fwd_Greene_model2(plow, trajsum(i).tvec, N0, Udata, dt, tdrug);
 [Nsrhigh, tcrit, Ncrith] = fwd_Greene_model2(pup, trajsum(i).tvec, N0, Udata, dt, tdrug);
 % Add to the trajsum data structure the model fit for that Cdox (whether it
 % is calibrated or predicted)
 trajsum(i).Nsrmod = Nsrmod(:,1);
 trajsum(i).Nsrmat = Nsrmat;
+trajsum(i).NsrN = NsrN(:,1);
 trajsum(i).Nsrlow = Nsrlow;
 trajsum(i).Nsrhigh = Nsrhigh;
 end
@@ -92,15 +101,17 @@ for i = 1:4
     hold on
     text(trajsum(j).tvec(end), trajsum(j).Nmean(end), ['Cdox= ', num2str(trajsum(j).Cdox), ' nM'], 'FontSize', 12)
 
-    plot(trajsum(j).tvec, trajsum(j).Nsrmod, '-', 'LineWidth', 2,'color', trajsum(j).color )
+   
     for m = 1:height(pareto_table)
     pl2=plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), 'k-', 'LineWidth', 2);
     pl2.Color(4) = 0.2;
     end
+    plot(trajsum(j).tvec, trajsum(j).Nsrmod, '-', 'LineWidth', 2,'color', trajsum(j).color )
+    plot(trajsum(j).tvec, trajsum(j).NsrN, 'r--', 'LineWidth', 2)
 end
 xlabel ('time (hours)')
 ylabel ('N(t)')
-title('N(t) data vs model from calibrated doses')
+title('N(t) data vs pareto front parameter sets for calibrated doses')
 set(gca,'FontSize',20,'LineWidth',1.5)
 %%
 figure;
@@ -115,6 +126,8 @@ for i = 1:4
     pl3 = plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), 'k-', 'LineWidth', 1);
     pl3.Color(4) = 0.3;
     end
+    plot(trajsum(j).tvec, trajsum(j).Nsrmod, '-', 'LineWidth',2,'color', trajsum(j).color  )
+    plot(trajsum(j).tvec, trajsum(j).NsrN, 'r--', 'LineWidth', 2)
     %plot(trajsum(j).tvec, trajsum(j).Nsrlow(:,1), 'b--', 'LineWidth', 1)
     %plot(trajsum(j).tvec, trajsum(j).Nsrhigh(:,1), 'b--', 'LineWidth', 1)
     xlabel ('time (hours)')
@@ -122,7 +135,7 @@ for i = 1:4
     
 ylabel ('N(t)')
 title(['Cdox= ', num2str(trajsum(j).Cdox), ' nM'])
-legend('N(t) data', 'model','Location', 'NorthWest')
+legend('N(t) data', ' pareto','Location', 'NorthWest')
     legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
 end
@@ -142,7 +155,8 @@ for i = 1:length(dosevecnew)
     pl3 = plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), 'k-', 'LineWidth', 1);
     pl3.Color(4) = 0.3;
     end
-    
+    plot(trajsum(j).tvec, trajsum(j).Nsrmod, '-', 'LineWidth',2,'color', trajsum(j).color  )
+    plot(trajsum(j).tvec, trajsum(j).NsrN, 'r--', 'LineWidth', 2)
     %plot(trajsum(j).tvec, trajsum(j).Nsrlow(:,1), '--', 'LineWidth', 1,'color', trajsum(j).color)
     %plot(trajsum(j).tvec, trajsum(j).Nsrhigh(:,1), '--', 'LineWidth', 1, 'color', trajsum(j).color)
 end
@@ -160,12 +174,14 @@ for i = 1:length(dosevecnew)
     j = dosevecnew(i);
     errorbar(trajsum(j).tvec, trajsum(j).Nmean,  1.96*trajsum(j).Nstd/2, '*', 'color', trajsum(j).color)
     hold on
-    plot(trajsum(j).tvec, trajsum(j).Nsrmod(:,1), 'b-', 'LineWidth', 3)
+    %plot(trajsum(j).tvec, trajsum(j).Nsrmod(:,1), 'b-', 'LineWidth', 3)
     for m = 1:height(pareto_table)
     pl3 = plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), 'k-', 'LineWidth', 1);
     pl3.Color(4) = 0.3;
     end
-    
+    CCCpareto(i) = f_CCC([reshape(trajsum(j).Nsrmat, [], 1), repmat(trajsum(j).Nmean, height(pareto_table),1)], 0.05);
+    plot(trajsum(j).tvec, trajsum(j).Nsrmod, '-', 'LineWidth',2,'color', trajsum(j).color  )
+    plot(trajsum(j).tvec, trajsum(j).NsrN, 'r--', 'LineWidth', 2)
     %plot(trajsum(j).tvec, trajsum(j).Nsrlow(:,1), 'b--', 'LineWidth', 1)
     %plot(trajsum(j).tvec, trajsum(j).Nsrhigh(:,1), 'b--', 'LineWidth', 1)
     % find CCC
@@ -176,15 +192,21 @@ for i = 1:length(dosevecnew)
     xlim([0 trajsum(j).tvec(end)])
     xlabel ('time (hours)')
     ylabel ('N(t)')
-    title(['Cdox= ', num2str(trajsum(j).Cdox), ' nM, CCC= ', num2str(round(CCC(i),3))])
+    title(['Cdox= ', num2str(trajsum(j).Cdox), ' nM, CCC= ', num2str(round(CCC(i),3)), ', CCC_{pareto}=', num2str(round(CCCpareto(i),3))])
     legend('N(t) data', 'prediction', 'model uncertainty','Location', 'NorthWest')
     legend boxoff
     set(gca,'FontSize',20,'LineWidth',1.5)
 end
 CCC_all = f_CCC([Npred, Ndat], 0.05);
+%%
 figure;
 hold on
 plot(Ndat, Npred, 'o')
+hold on
+for i =1:3%:length(dosevecnew)
+    j = dosevecnew(i);
+plot(repmat(trajsum(j).Nmean, height(pareto_table)), reshape(trajsum(j).Nsrmat, [], 1),'.')
+end
 plot([0 max(Npred)], [0 max(Npred)], 'k-', 'LineWidth', 3)
 xlim([0 max(Npred)])
 ylim([0 max(Npred)])

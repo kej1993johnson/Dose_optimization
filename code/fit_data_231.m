@@ -1,4 +1,6 @@
 % This script loads in Grant's raw dose response data and begins performing
+% some preliminary growth rate and bi-exponential model fitting
+
 % We do this for the 231s only (hence title)
 % Note 231s start at 961
 close all; clear all; clc;
@@ -10,25 +12,25 @@ ntot = length(traj);
 %
 for i = 1:ntot
 matches= ismember(traj(i).celltype, '231');
-matchesdate = ismember(traj(i).date, '5-6-19');
+%matchesdate = ismember(traj(i).date, '5-6-19');
 ind(i) = all(matches, 'all');
-ind2(i) = all(matchesdate, 'all');
+%ind2(i) = all(matchesdate, 'all');
 
 end
-indall = and(ind,ind2);
-trajM = traj(indall);
+%indall = and(ind,ind2);
+trajM = traj(ind);
 traj = trajM;
 
 %% Flip through raw data trajectories
 % ctrl C to end this loop without iterating through all!
-figure;
-for j = 1:length(traj)
-    plot(traj(j).time, traj(j).rawN, 'LineWidth', 2, 'color', num2str(traj(j).color))
-    xlabel ('time (hours)')
-    ylabel('N(t)')
-    title(['Raw data, dose =' num2str(traj(j).dose), 'nM'])
-    pause
-end
+% figure;
+% for j = 1:length(traj)
+%     plot(traj(j).time, traj(j).rawN, 'LineWidth', 2, 'color', num2str(traj(j).color))
+%     xlabel ('time (hours)')
+%     ylabel('N(t)')
+%     title(['Raw data, dose =' num2str(traj(j).dose), 'nM'])
+%     pause
+% end
 %% Plot trajectories together by dose
 % Look at variation among replicates
 for j = 1:length(traj)
@@ -76,11 +78,11 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 % For the first data set, let's set N0 at t0 as the time after drug
 % We'll set Nend as either the last data point or when the cell number
 % exceeds 2e4
-Nfin=5.5e4;
+Nfin=5e4;
 for i = 1:length(traj)
     N = traj(i).rawN;
     t = traj(i).time;
-    i0 = find(t>traj(i).tdose,1,'first'); % I arbitrarily search for a maximum in the first 200 hours
+    i0 = find(t>traj(i).tdose(1),1,'first'); % I arbitrarily search for a maximum in the first 200 hours
     N0 = N(i0); % set N0 as maximum over first 200 hours
     iend = find(N>=Nfin,1, 'first');
     if ~isempty(iend)
@@ -341,41 +343,41 @@ end
 
 %% Flip through model fit compared to data
 % Show best fitting "chosen" model
-
-figure;
-for j = 1:length(traj)
-    hold off
-    plot(traj(j).tfit, traj(j).Nfit, 'LineWidth', 2, 'color', num2str(traj(j).color))
-    hold on
-    
-        if isempty(traj(j).tmod)
-    plot(traj(j).tfit(2:end), traj(j).biexpmodel, 'LineWidth', 2, 'color', 'k')
-        end
-        if ~isempty(traj(j).tmod)
-     plot(traj(j).tmod, traj(j).biexpmodel, 'LineWidth', 2, 'color', 'k')   
-        end
-    title(['Data fit to biexp model, \phi=', num2str(traj(j).params2(1)),', g=', num2str(traj(j).params2(2)),', k=', num2str(traj(j).params2(3))])
-   
-    
-%     if traj(j).bfmod ==2
-%     plot(traj(j).tfit(2:end), traj(j).expmodeld, 'LineWidth', 2, 'color', 'k')
-%     title(['Data fit to exp death model, k=', num2str(traj(j).paramsd(1))])
+% 
+% figure;
+% for j = 1:length(traj)
+%     hold off
+%     plot(traj(j).tfit, traj(j).Nfit, 'LineWidth', 2, 'color', num2str(traj(j).color))
+%     hold on
+%     
+%         if isempty(traj(j).tmod)
+%     plot(traj(j).tfit(2:end), traj(j).biexpmodel, 'LineWidth', 2, 'color', 'k')
+%         end
+%         if ~isempty(traj(j).tmod)
+%      plot(traj(j).tmod, traj(j).biexpmodel, 'LineWidth', 2, 'color', 'k')   
+%         end
+%     title(['Data fit to biexp model, \phi=', num2str(traj(j).params2(1)),', g=', num2str(traj(j).params2(2)),', k=', num2str(traj(j).params2(3))])
+%    
+%     
+% %     if traj(j).bfmod ==2
+% %     plot(traj(j).tfit(2:end), traj(j).expmodeld, 'LineWidth', 2, 'color', 'k')
+% %     title(['Data fit to exp death model, k=', num2str(traj(j).paramsd(1))])
+% %     end
+% %     
+% %     if traj(j).bfmod ==3
+% %     plot(traj(j).tfit(2:end), traj(j).expmodelg, 'LineWidth', 2, 'color', 'k')
+% %     title(['Data fit to exp growth model, g=', num2str(traj(j).paramsg(1))])
+% %     end
+%     
+%     if ~isempty(traj(j).tcrit)
+%         plot(traj(j).tcrit, traj(j).Ncrit, 'k*')
 %     end
 %     
-%     if traj(j).bfmod ==3
-%     plot(traj(j).tfit(2:end), traj(j).expmodelg, 'LineWidth', 2, 'color', 'k')
-%     title(['Data fit to exp growth model, g=', num2str(traj(j).paramsg(1))])
-%     end
-    
-    if ~isempty(traj(j).tcrit)
-        plot(traj(j).tcrit, traj(j).Ncrit, 'k*')
-    end
-    
-%     xlim( [ 0 traj(j).tfit(end)])
-    xlabel ('time (hours)')
-    ylabel('N(t)')
-    pause
-end
+% %     xlim( [ 0 traj(j).tfit(end)])
+%     xlabel ('time (hours)')
+%     ylabel('N(t)')
+%     pause
+% end
 %% Critical time vs dox concetration
 figure;
 for i = 1:length(traj)

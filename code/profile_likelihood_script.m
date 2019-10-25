@@ -17,12 +17,12 @@ numpoints = 20;
 params = pbest; % rs, alpha, zr, ds, zd];
 threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
 profiles = [];
-%% For 231s
+%% For 231s without fitting phi0
 pboundsprof = [0, Inf; 0, Inf; 0, Inf; 0, Inf; 0, Inf];
 %% For CLL
 Ub = Uphi;
 lengthvec = lengthvecN;
-%%
+%% 231s with fitting phi0
 pboundsprof = [0, Inf; 0, Inf; 0, Inf; 0, Inf; 0, Inf; 0, Inf];
 %%
 
@@ -102,16 +102,16 @@ plist = {'\phi_{0}','r_{s}', 'r_{r}/r_{s} ratio', '\alpha', 'd_{s}', 'd_{r}/d_{s
 threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
 figure;
 for i = 1:length(pbest)
-subplot(1,length(pbest),i)
+subplot(2,3,i)
 plot(profiles(:,1, i), profiles(:,2, i),'b-', 'LineWidth', 1.8)
 hold on
 plot(pbest(i), negLL, 'r*')
 plot([profiles(1,1,i) profiles(end,1,i)],[threshold threshold],'r--')
-xlabel('profiled param')
-ylabel('cost function value')
-set(gca,'FontSize',20,'LineWidth',1.5)
-title(plist(i))
-%ylim([110 150])
+xlabel(plist(i))
+ylabel('cost')
+set(gca,'FontSize',16,'LineWidth',1.5)
+%title(plist(i))
+ylim([75 90])
 xlim([profiles(1,1,i),profiles(end,1,i)])
 %xlim([CI(i,1)-0.1*pbest(i),CI(i,2)+0.1*pbest(i)])
 end

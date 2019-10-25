@@ -10,6 +10,20 @@
  %% Load in data from 231 dose response and from fit
 S = load('../out/trajfit231.mat');
 traj= S.traj;
+% Only look at the first dose data from one experiment
+ntot = length(traj);
+%
+for i = 1:ntot
+matches= ismember(traj(i).celltype, '231');
+matchesdate = ismember(traj(i).date, '5-6-19');
+ind(i) = all(matches, 'all');
+ind2(i) = all(matchesdate, 'all');
+
+end
+indall = and(ind,ind2);
+trajM = traj(indall);
+traj = trajM;
+
 
 % Use the fit parameters from N(t) only to make the parameter domains
 p4fit = load('../out/p4fit231.mat');
@@ -43,22 +57,24 @@ carcapphi =20e6; % set this based on final outgrowth
 
 %% Plot the phi(t) data from single cell sequencing output
 figure;
-subplot(2,1,1)
-errorbar(tbot, phitrt, phisigfit/2,  'go', 'LineWidth', 4)
+errorbar(tbot, phitrt, 5*phisigfit,  'go', 'LineWidth', 4)
 hold on
-errorbar(tbot, 1-phitrt, phisigfit/2, 'ro', 'LineWidth', 4)
+errorbar(tbot, 1-phitrt, 5*phisigfit, 'ro', 'LineWidth', 4)
 legend('\phi_{sens}(t)', '\phi_{res}(t)', 'Location', 'NorthWest')
 legend boxoff
-xlabel('time(hours)')
+xlabel('time (hours)')
 ylabel(' \phi(t) data')
-xlim([ 0 1656])
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlim([ 0 1666])
 ylim([ 0 1.2])
-title('\phi(t) for dosing for scRNAseq expt')
+%title('\phi(t) for dosing for scRNAseq expt')
+figure;
 subplot(2,1,2)
 plot(tgen, Ub, 'b-', 'LineWidth', 3)
 xlabel('time (hours)')
 ylabel('Effective dose U(t)')
 title('U(t) for dose for scRNAseq expt')
+set(gca,'FontSize',20,'LineWidth',1.5)
 xlim([ 0 1656])
 
 
@@ -79,6 +95,7 @@ uniqdose= unique(doselist);
     trajsum(i).Nmat = [];
     trajsum(i).nreps = 0;
     trajsum(i).tmat = [];
+    trajsum(i).tcritvec= [];
  end
 
  for i = 1:length(uniqdose) % number of unique seed numbers
@@ -92,11 +109,13 @@ uniqdose= unique(doselist);
                     trajsum(i).tmat = horzcat(trajsum(i).tmat,traj(j).time);
                     trajsum(i).Nmat = horzcat(trajsum(i).Nmat, traj(j).rawN);
                     trajsum(i).tdose = traj(j).tdose;
+                    % Need to think on how to deal with sensoring!
+                    trajsum(i).tcritvec = horzcat(trajsum(i).tcritvec, traj(j).tcrit);
                 end
         end
     end
  end
- % Again, clean data for fitting... (cut off data before carcap)
+ %% Again, clean data for fitting... (cut off data before carcap)
  for i = 1:length(trajsum)
 %     if i ==1
 %     Nfin = 5e4;
@@ -144,24 +163,32 @@ for i = 1:length(trajsum)
     trajsum(i).Nmean = mean(trajsum(i).Nfit,2);
     trajsum(i).tvec = round(trajsum(i).tfit(:,1),0);
     trajsum(i).Nstd = std(trajsum(i).Nfit,0,2);
+    trajsum(i).tcritmean = mean(trajsum(i).tcritvec);
+    trajsum(i).tcritstd = std(trajsum(i).tcritvec);
 end
 % Plot the average data 
   figure;
   dosevec = [ 1, 4, 7, 9];
-for j=1:length(dosevec)
-    i = dosevec(j);
+  dosevecall = 1:10;
+for j=1:length(dosevecall)
+    i = dosevecall(j);
  
      subplot(2,1,2)
          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
          hold on
-         text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 16)
-         plot(trajsum(i).tvec, trajsum(i).Nmean + 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
-        xlabel('time (hours)')
-        ylabel('N(t)')
-        title('N(t) data')
+         text(trajsum(i).tvec(end-4), trajsum(i).Nmean(end)+1.96*trajsum(i).Nstd(end), [num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
+         %for m = 1:6
+             %plot(trajsum(i).tvec, trajsum(i).Nfit(:,m), 'color', trajsum(i).color, 'LineWidth',1)
+         %end
+          errorbar(trajsum(i).tvec, trajsum(i).Nmean, 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         %plot(trajsum(i).tvec, trajsum(i).Nmean - 1.96*trajsum(i).Nstd, 'color', trajsum(i).color)
+         
+         xlabel('time (hours)')
+        ylabel('N(t) experimental data')
+        %title('N(t) data')
         set(gca,'FontSize',20,'LineWidth',1.5)
-        
+        xlim([0 trajsum(10).tvec(end)])
+        ylim([0 6e4])
         dt = 1;
        subplot(2,1,1)
        ttest = [];
@@ -169,12 +196,25 @@ for j=1:length(dosevec)
        plot(ttest, trajsum(i).U,'*', 'color',trajsum(i).color, 'LineWidth',1)
         hold on
         xlabel('time (hours)')
-        ylabel('Effective dose U(t)')
-        title('Effective dose (u(t)) ')
+        ylabel('Effective dose (u(t))')
+        %title('Effective dose (u(t)) ')
         set(gca,'FontSize',20,'LineWidth',1.5)
-        legend('0 nM', '75 nM', '200 nM', '500 nM', 'Location', 'NorthEast')
+        legend('0 nM', '25 nM', '50 nM', '75 nM','100 nM', '150 nM', '200 nM', '300 nM', '500 nM','1000 nM', 'Location', 'NorthEast')
         legend boxoff
+        xlim([0 trajsum(10).tvec(end)])
 save('../out/trajsumfit231.mat', 'trajsum')
+end
+
+%% Make plot of trit verus dox
+figure;
+for i = 1:length(trajsum)
+    errorbar(trajsum(i).Cdox, trajsum(i).tcritmean, 1.96*trajsum(i).tcritstd, '*', 'color', trajsum(i).color', 'LineWidth',2)
+hold on
+ set(gca,'FontSize',20,'LineWidth',1.5)
+ %legend('0 nM', '25 nM', '50 nM', '75 nM','100 nM', '150 nM', '200 nM', '300 nM', '500 nM','1000 nM', 'Location', 'NorthEast')
+ xlabel('Doxorubicin Concentration')
+ ylabel('Measured t_{crit}=time to 2N_{0} (hours)')
+ xlim([0 350])
 end
 %% Compile dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
@@ -228,7 +268,7 @@ pbounds =  [ 0,1; 0,1; 0,1; 0,1; 0,1; 0,1];
 %Give this function both Ntrt and phitrt
 % can toggle the amount that we weigh each portion..
 % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
-lambda = 0.995;
+lambda = 0.993;
 % This function internally instead of actually fitting rr and dr, fits the ratio 
 [pbest,N_model, phi_model, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % Adjust transformed parameter estimates so we capture estimated value
@@ -242,23 +282,160 @@ ds = pbest(5);
 zd = pbest(6);
 dr = ds*zd;
 
+% Set lambda = 0 and find the fit with N(t) data only
+[pbestN,N_modelN, phi_modelN, negLLN, err_NN, err_phiN] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,0, pbounds);
+phi0N = pbestN(1);
+rsN =pbestN(2);
+alphaN = pbestN(3);
+zrN = pbestN(4);
+rrN = rsN*zrN;
+dsN = pbestN(5);
+zdN = pbestN(6);
+drN = dsN*zdN;
+% Set lambda = 1 and find the fit with phi(t) data only
+[pbestphi,N_modelphi, phi_modelphi, negLLphi, err_Nphi, err_phiphi] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,1-1e-12, pbounds);
+phi0phi = pbestphi(1);
+rsphi =pbestphi(2);
+alphaphi = pbestphi(3);
+zrphi = pbestphi(4);
+rrphi = rsphi*zrphi;
+dsphi = pbestphi(5);
+zdphi = pbestphi(6);
+drphi = dsphi*zdphi;
 % Simulate the phi(t) trajectory from all time points
 phi_model_long = simmodelgreenephi2(pbest, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
+phi_model_longN = simmodelgreenephi2(pbestN, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
+phi_model_longphi = simmodelgreenephi2(pbestphi, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
 
 CCC_vec(1) = f_CCC([N_model, ydatafit], 0.05);
 CCC_vec(2) = f_CCC([phi_model, phitrt], 0.05);
 fvalbest = negLL
-pbest = pbest
+
 
 psave = [phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot];
 save('../out/ptest.mat', 'psave')
-%% Plot first pass fitting results with an arbitrary lambda
 
+psaveN = [phi0N, carcapNf, carcapphi, rsN, alphaN, zrN, dsN, zdN,k, kdrug, gtot];
+save('../out/ptestN.mat', 'psaveN')
+
+psavephi = [phi0phi, carcapNf, carcapphi, rsphi, alphaphi, zrphi, dsphi, zdphi,k, kdrug, gtot];
+save('../out/ptestphi.mat', 'psavephi')
+
+%% Plot first pass fitting results with an arbitrary (intermediate) lambda
+
+figure;
+subplot(1,2,1)
+hold on
+plot(ytimefit, N_model, 'k*', 'LineWidth',3)
+for j = 1:length(dosevec)
+    i = dosevec(j);
+    errorbar(trajsum(i).tvec, trajsum(i).Nmean, 1.96*trajsum(i).Nstd, '*','color', trajsum(i).color')
+ text(trajsum(i).tvec(end), trajsum(i).Nmean(end), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
+end
+plot(ytimefit, N_model, 'k*', 'LineWidth',3)
+ %plot(ytimefit, ydatafit-1.96*sigmafit, 'b.')
+%text(ytimeunt(20), Nfitunt(20,ind), ['CCC_{Ntrt}=', num2str(CCC_Ntrt(ind)),', CCC_{pfit}=', num2str(CCC_ptrt(ind))])
+xlabel ('time (hours)')
+ylabel(' N(t)')
+ylim([ 0 5e4])
+legend ( 'model fit N(t)', 'n(t) data', 'Location', 'NorthWest')
+legend box off
+%title (['N(t), CCC_{N}=', num2str(CCC_vec(1))])
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+subplot(1,2,2)
+%plot(tbot, phitrt, 'g*', 'LineWidth',5)
+hold on
+plot(tgen, phi_model_long,'k-', 'LineWidth',3)
+errorbar(tbot, phitrt, 5*phisigfit,  'go', 'LineWidth', 3)
+
+%plot(tbot, phitrt + 1.96*phisigfit, 'k.')
+%plot(tbot, phitrt - 1.96*phisigfit, 'k.')
+%plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
+xlabel ('time (hours)')
+ylabel(' \phi_{sens}(t)')
+legend ('model fit \phi_{sens}(t)', '\phi_{sens}(t) data', 'Location', 'NorthWest')
+legend box off
+%title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(2))])
+set(gca,'FontSize',20,'LineWidth',1.5)
+ylim([0 1.5])
+xlim([0 1656])
+
+% Make a plot of the theoretical critical time vs dox concentration
+tbig = [0:1:1000];
+for i = 1:length(Cdoxvec)
+    Ui = k*Cdoxvec(i)*exp(-kdrug*(tbig))/(0.1*Cdoxmax); 
+    pi = [ phi0, carcapNf,rs,alpha, zr, ds, zd];
+    N0i = trajsum(i).Nmean(1);
+    tdrug =1;
+    [Nsri, tcrit(i), Ncrit] = fwd_Greene_model2(pi, tbig, N0i, Ui, dt, tdrug);
+end
+%% Make tcrit vs dox for calibrated doses
+
+
+figure;
+plot(Cdoxvec, tcrit, 'k-', 'LineWidth', 3)
+hold on
+dosevecpred = [2 3 5 6 8 10]
+for j = 1:length(dosevecpred)
+    i = dosevecpred(j);
+    errorbar(trajsum(i).Cdox, trajsum(i).tcritmean, 1.96*trajsum(i).tcritstd, '*', 'color', trajsum(i).color', 'LineWidth', 3)
+    %text(trajsum(i).Cdox+5, trajsum(i).tcritmean-10, ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
+  
+end
+legend('model predicted t_{crit}', 'measured data t_{crit}', 'Location', 'NorthWest')
+legend boxoff
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('Doxorubicin Concentration')
+xlim([ 0 400])
+ylabel('Model predicted & data t_{crit} (hours)')
+
+figure;
+for j = 1:length(dosevecpred)
+    i = dosevecpred(j);
+plot(trajsum(i).tcritvec, tcrit(i)*ones(length(trajsum(i).tcritvec),1), '*','color', trajsum(i).color, 'LineWidth', 3)
+hold on
+end
+plot([1:1:(max(tcrit))], [1:1:(max(tcrit))], 'k-', 'LineWidth',2)
+xlabel('measured t_{crit} (hours)')
+ylabel('predicted t_{crit} (hours)')
+xlim([ 0 500])
+ylim([0 500])
+set(gca,'FontSize',20,'LineWidth',1.5)
+%% Make tcrit vs dox for ppredicted doses
+figure;
+plot(Cdoxvec, tcrit, 'k-', 'LineWidth', 3)
+hold on
+for j = 1:length(dosevec)
+    i = dosevec(j);
+    errorbar(trajsum(i).Cdox, trajsum(i).tcritmean, 1.96*trajsum(i).tcritstd, '*', 'color', trajsum(i).color', 'LineWidth', 3)
+    %text(trajsum(i).Cdox+5, trajsum(i).tcritmean-10, ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'], 'FontSize', 14)
+  
+end
+legend('calibrated model t_{crit}', 'measured data t_{crit}', 'Location', 'NorthWest')
+legend boxoff
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('Doxorubicin Concentration')
+xlim([ 0 550])
+ylabel('Calibrated model & data t_{crit} (hours)')
+
+figure;
+for j = 1:length(dosevec)
+    i = dosevec(j);
+plot(trajsum(i).tcritvec, tcrit(i)*ones(length(trajsum(i).tcritvec),1), '*','color', trajsum(i).color, 'LineWidth', 3)
+hold on
+end
+plot([1:1:(max(tcrit))], [1:1:(max(tcrit))], 'k-', 'LineWidth',2)
+xlabel('measured t_{crit} (hours)')
+ylabel('calibrated t_{crit} (hours)')
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+%% Plot the fitting results fitting on N(t) only
 figure;
 subplot(1,2,1)
 errorbar(ytimefit, ydatafit, 1.96*sigmafit/2, 'b*')
 hold on
-plot(ytimefit, N_model, 'k.', 'LineWidth',1)
+plot(ytimefit, N_modelN, 'k.', 'LineWidth',1)
 for j = 1:length(dosevec)
     i = dosevec(j);
  text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
@@ -269,14 +446,14 @@ xlabel ('time (hours)')
 ylabel(' N(t)')
 legend ( 'N(t) data & 95% CI','model fit', 'Location', 'NorthWest')
 legend box off
-title (['N(t), CCC_{N}=', num2str(CCC_vec(1))])
+title ('N(t) fit with N(t) data only')
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
 %plot(tbot, phitrt, 'g*', 'LineWidth',5)
 hold on
 errorbar(tbot, phitrt, phisigfit/2,  'go', 'LineWidth', 4)
-plot(tgen, phi_model_long,'k-', 'LineWidth',2)
+plot(tgen, phi_model_longN,'k-', 'LineWidth',2)
 %plot(tbot, phitrt + 1.96*phisigfit, 'k.')
 %plot(tbot, phitrt - 1.96*phisigfit, 'k.')
 %plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
@@ -284,7 +461,42 @@ xlabel ('time (hours)')
 ylabel(' \phi_{sens}(t)')
 legend ('\phi_{sens}(t) data','model fit','95% CI on data', 'Location', 'NorthWest')
 legend box off
-title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(2))])
+title ('\phi(t) fit with N(t) data only')
+set(gca,'FontSize',20,'LineWidth',1.5)
+ylim([0 1.5])
+xlim([0 1656])
+%% Plot the fitting results fitting on phi(t) only
+figure;
+subplot(1,2,1)
+errorbar(ytimefit, ydatafit, 1.96*sigmafit/2, 'b*')
+hold on
+plot(ytimefit, N_modelphi, 'k.', 'LineWidth',1)
+for j = 1:length(dosevec)
+    i = dosevec(j);
+ text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
+end
+ %plot(ytimefit, ydatafit-1.96*sigmafit, 'b.')
+%text(ytimeunt(20), Nfitunt(20,ind), ['CCC_{Ntrt}=', num2str(CCC_Ntrt(ind)),', CCC_{pfit}=', num2str(CCC_ptrt(ind))])
+xlabel ('time (hours)')
+ylabel(' N(t)')
+legend ( 'N(t) data & 95% CI','model fit', 'Location', 'NorthWest')
+legend box off
+title ('N(t) fit with \phi(t) data only')
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+subplot(1,2,2)
+%plot(tbot, phitrt, 'g*', 'LineWidth',5)
+hold on
+errorbar(tbot, phitrt, phisigfit/2,  'go', 'LineWidth', 4)
+plot(tgen, phi_model_longphi,'k-', 'LineWidth',2)
+%plot(tbot, phitrt + 1.96*phisigfit, 'k.')
+%plot(tbot, phitrt - 1.96*phisigfit, 'k.')
+%plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
+xlabel ('time (hours)')
+ylabel(' \phi_{sens}(t)')
+legend ('\phi_{sens}(t) data','model fit','95% CI on data', 'Location', 'NorthWest')
+legend box off
+title ('\phi(t) fit with \phi(t) data only')
 set(gca,'FontSize',20,'LineWidth',1.5)
 ylim([0 1.5])
 xlim([0 1656])
@@ -313,7 +525,7 @@ figure;
 subplot(1,2,1)
 for j = 1:length(dosevec)
     i = dosevec(j);
-    plot(trajsum(i).tvec, trajsum(i).Nsrmod(:,1), 'color', trajsum(i).color, 'LineWidth', 2)
+    plot(trajsum(i).tvec, trajsum(i).Nsrmod(:,1), 'k-', 'LineWidth', 2)
     hold on
 end
 for j = 1:length(dosevec)
@@ -351,10 +563,10 @@ xlim([0 1656])
 % different values of lambda. 
 
 % Eventually, we want to get more of these
-lambdavec1 = linspace(0.99, 1, 100);
+lambdavec1 = linspace(0.99, 1, 1000);
 % instead try randomly sampling lambda
-lambdavec  = 0.99 + (0.01)*rand(100,1);
-%%
+lambdavec  = 0.98 + (0.02)*rand(1000,1);
+
 for i = 1:length(lambdavec)
     lambdai = lambdavec(i);
     [pbesti(:,i),N_modeli(:,i), phi_modeli(:,i), negLLi(:,i), weightederr_Ni, weightederr_phii] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambdai, pbounds);
@@ -364,9 +576,11 @@ for i = 1:length(lambdavec)
     CCC_phi(i) = f_CCC([phi_modeli(:,i), phitrt], 0.05);
     CCC_N(i) = f_CCC([N_modeli(:,i), ydatafit], 0.05);
 end
-%%
-pareto = horzcat(sumsqerrphi', sumsqerrN', pbesti')
-save('../out/pareto.mat', 'pareto')
+
+%% Save all of the values, but also choose from one on the boundary to use
+% going forward for parameter uncertainty and prediction
+pareto = horzcat(sumsqerrphi', sumsqerrN', pbesti', CCC_phi', CCC_N');
+save('../out/pareto.mat', 'pareto');
 
 %%
 paramnames = {'\phi_{0}','rs', 'zr', '\alpha', 'ds', 'zd'};
@@ -390,8 +604,70 @@ colorbar
 xlabel('weighted sum squared error in \phi(t)')
 ylabel('weighted sum squared error in N(t)')
 set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
-xlim([ 0 1e3])
-ylim([ 3e3 5e4])
+xlim([ 1e-2 3e1])
+ylim([ 1e4 2e4])
+legend('lambda iterations', 'fminsearch best fit')
+legend boxoff
+title('Objective function values')
+%% Select the parameter sets that are above the CCC threshold in N and phi fit
+%iphi = CCC_phi>0.8;
+iN = sumsqerrN<1.4e4;
+%ikeep = and(iphi, iN);
+ikeep = iN;
+phi0vals = pbesti(1,ikeep)';
+rsvals = pbesti(2,ikeep)';
+alphavals = pbesti(3,ikeep)';
+rr_rs_ratio= pbesti(4,ikeep)';
+dsvals = pbesti(5,ikeep)';
+dr_ds_ratio = pbesti(6,ikeep)';
+lambdas = lambdavec(ikeep);
+err_Nvals = sumsqerrN(ikeep)';
+err_phivals = sumsqerrphi(ikeep)';
+CCC_Nvals = CCC_N(ikeep)';
+CCC_phivals = CCC_phi(ikeep)';
+
+% Pass these parameter sets to a table to be imported into the prediction
+% script
+pareto_sel = horzcat(phi0vals,rsvals, alphavals, rr_rs_ratio, dsvals, dr_ds_ratio, err_Nvals, err_phivals, CCC_Nvals, CCC_phivals, lambdas);
+param_table = table(phi0vals,rsvals, alphavals, rr_rs_ratio, dsvals, dr_ds_ratio, err_Nvals, err_phivals, CCC_Nvals, CCC_phivals, lambdas );
+writetable(param_table,'../out/pbest_table.csv')
+
+%% Plot selected points
+figure;
+scatter(err_phivals, err_Nvals,[],lambdas, 'filled')
+hold on
+plot(err_phi, err_N, 'r*', 'LineWidth', 4)
+colorbar
+xlabel('weighted sum squared error in \phi(t)')
+ylabel('weighted sum squared error in N(t)')
+set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
+xlim([ 1e-2 3e1])
+ylim([ 1e4 1.5e4])
+legend('lambda iterations', 'fminsearch best fit')
+legend boxoff
+title('Objective function values')
+
+%%
+phi0 = paretobest(3);
+alpha = paretobest(4);
+rs = paretobest(5);
+zr = paretobest(6);
+ds = paretobest(7);
+zd = paretobest(8);
+
+psave = [paretobest(3), carcapNf, carcapphi, paretobest(4), paretobest(5), paretobest(6), paretobest(7), paretobest(8), k, kdrug, gtot];
+save('../out/ptest.mat', 'psave')
+%%
+figure;
+scatter(sumsqerrphi, sumsqerrN,[],lambdavec, 'filled')
+hold on
+%plot(paretobest(1), paretobest(2), 'r*', 'LineWidth', 4)
+colorbar
+xlabel('weighted sum squared error in \phi(t)')
+ylabel('weighted sum squared error in N(t)')
+set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
+xlim([ 1e-2 3e1])
+ylim([ 1e4 2e4])
 legend('lambda iterations', 'current best fit')
 legend boxoff
 title('Objective function values')
@@ -399,51 +675,17 @@ title('Objective function values')
 figure;
 scatter(CCC_phi, CCC_N,[],lambdavec, 'filled')
 hold on
-plot(CCC_vec(2), CCC_vec(1), 'r*', 'LineWidth', 4)
+plot(paretobest(7), paretobest(8), 'r*', 'LineWidth', 4)
 colorbar
 xlabel('CCC in \phi(t)')
 ylabel('CCC in N(t)')
 xlim([ 0.88 1])
-ylim([0.88 1])
+ylim([0.88 0.92])
 set(gca,'FontSize',20,'LineWidth',1.5)
 legend('lambda iterations', 'current best fit')
 legend boxoff
 title('CCC in model vs. data')
-%% Select the parameter sets that are above the CCC threshold in N and phi fit
-iphi = CCC_phi>0.88;
-iN = CCC_N>0.88;
-ikeep = and(iphi, iN);
-phi0vals = pbesti(1,ikeep)';
-phi0vals = vertcat(phi0vals, phi0);
-rsvals = pbesti(2,ikeep)';
-rsvals = vertcat(rsvals,rs);
-alphavals = pbesti(3,ikeep)';
-alphavals = vertcat(alphavals,alpha);
-rr_rs_ratio= pbesti(4,ikeep)';
-rr_rs_ratio = vertcat(rr_rs_ratio, zr);
-dsvals = pbesti(5,ikeep)';
-dsvals = vertcat(dsvals, ds);
-dr_ds_ratio = pbesti(6,ikeep)';
-dr_ds_ratio = vertcat(dr_ds_ratio, zd);
-%%
-lambdas = lambdavec(ikeep);
-lambdas = vertcat(lambdas, lambda);
-err_Nvals = sumsqerrN(ikeep)';
-err_Nvals = vertcat(err_Nvals, err_N);
-err_phivals = sumsqerrphi(ikeep)';
-err_phivals = vertcat(err_phivals, err_phi);
-CCC_Nvals = CCC_N(ikeep)';
-CCC_Nvals = vertcat(CCC_Nvals, CCC_vec(1));
-CCC_phivals = CCC_phi(ikeep)';
-%%
-CCC_phivals = vertcat(CCC_phivals, CCC_vec(2));
 
-% Pass these parameter sets to a table to be imported into the prediction
-% script
-param_table = table(phi0vals,rsvals, alphavals, rr_rs_ratio, dsvals, dr_ds_ratio, err_Nvals, err_phivals, CCC_Nvals, CCC_phivals, lambdas )
-writetable(param_table,'../out/pbest_table.csv')
-% test we can load it back in
-pareto = readtable('../out/pbest_table.csv')
 %%
 paramnames = {'\phi_{0}','rs', 'zr', '\alpha', 'ds', 'zd'};
 figure;

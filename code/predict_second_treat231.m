@@ -19,6 +19,12 @@ ptest = struct2cell(ptest);
 ptest = cell2mat(ptest);
 P = num2cell(ptest);
 
+ptestN = load('../out/ptestN.mat');
+ptestN = struct2cell(ptestN);
+ptestN = cell2mat(ptestN);
+PN = num2cell(ptestN);
+
+
 % Also don't really need the confidence intervals
 CI = load('../out/CIpbest.mat');
 CI = struct2cell(CI);
@@ -31,6 +37,7 @@ CIds = CI(5,:);
 CIzd=CI(6,:);
 
 [phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot] = deal(P{:});
+[phi0N, carcapNf, carcapphi, rsN, alphaN, zrN, dsN, zdN, k, kdrug, gtot] = deal(PN{:});
 
 %% Run this forward for a single pulse treatment at 200 nM 
 % Again, assume R0=0; dr = 0 and
@@ -84,7 +91,7 @@ plot(tlong, Nsri(:,2), 'g','LineWidth',2)
 plot(tlong, Nsri(:,3),'r', 'LineWidth',2)
 text(tlong(2), Nsri(2,2),['\phi_{sens_i}=', num2str(1)])
 text(tlong(end-20), Nsri(end-20,2),['\phi_{sens_f}=', num2str(fracSens)])
-xlim([ 0 384])
+xlim([ 0 24*6])
 xlabel ('time (hours)')
 ylabel ('N(t)')
 title('S(t) & R(t)for single 200 nM pulse treatment')
@@ -115,59 +122,111 @@ title('\phi_{S} & \phi_{R} following single 200 nM pulse treatment')
 % legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
 
-%% Test function to create an easy to work with combined data structure
-% Note for now this isn't going to work since we don't have the 231 repeat
-% treatment data
-filter_criteria = 'treatmentnum';
-ntreat = 2;
-dose = 200;
-date = '';
-[traj2] = comb_data_fxn(traj, filter_criteria, ntreat, dose, date)
+%% Make trajsum of repeat treatment data
+
+% Only look at the first dose data from one experiment
+ntot = length(traj);
+%
+for i = 1:ntot
+    matches= traj(i).code==1914;
+indcode(i) = matches;
+ind2(i) = traj(i).numdoses ==2;
 
 
-
+end
+indall = and(indcode, ind2);
+traj2 = traj(indall);
+repeat_trts = [12 14 16];
+% Make a new structure which combines each dox concentration
+ for i = 1:length(repeat_trts)
+    traj2sum(i).Cdox = [];
+    traj2sum(i).Nmat = [];
+    traj2sum(i).nreps = 0;
+    traj2sum(i).tmat = [];
+ end
+ 
+ 
+ for i = 1:length(repeat_trts) % number of unique seed numbers
+    for j = 1:length(traj2)
+        if traj2(j).doseintdays==repeat_trts(i)  % only want data from this run
+                    traj2sum(i).nreps = traj2sum(i).nreps +1;
+                    traj2sum(i).Cdox = traj2(j).dose;
+                    traj2sum(i).color = traj2(j).color;
+                    traj2sum(i).tmat = horzcat(traj2sum(i).tmat,traj2(j).tfit);
+                    traj2sum(i).Nmat = horzcat(traj2sum(i).Nmat, traj2(j).Nfit);
+                    traj2sum(i).tdose = traj2(j).tdose;
+           
+                end
+        end
+ end
+    
+ %%
+ for i = 1:length(traj2sum)
+    traj2sum(i).Nmean = mean(traj2sum(i).Nmat,2);
+    traj2sum(i).tvec = round(traj2sum(i).tmat(:,1),0);
+    traj2sum(i).Nstd = std(traj2sum(i).Nmat,0,2);
+    traj2sum(i).doseintdays = (traj2sum(i).tdose(2)-traj2sum(i).tdose(1))./24;
+ end
 
 %% Write a function to find phi at a certain time
 % If repeat dose is within the time frame measured in the first pusle
 % treatment
-repeat_trts = [ 4 6 8 10 ]; % days at which the treatment was repeated
+%repeat_trts = [ 5 7 9 10 ]; % days at which the treatment was repeated
   Cdox = 200;
   Cdoxmax = 1000;
 figure;
 for i = 1:length(repeat_trts)
    % Find the Number of sensitive and resisitant cells predicted at start
    % of second treatment
-    tdose = repeat_trts(i)*24;
+    tdose = (repeat_trts(i))*24; % make it the end time
     tfirst = 0:1:tdose;
-    tsecond = 0:1:336; % monitor for two weeks after
+    tsecond = 0:1:traj2sum(i).tvec(end); % monitor for a while after
     tdrug = [0; tdose];
     ttot = horzcat(tfirst, tsecond(2:end) + tfirst(end));
     U1=k*Cdox*exp(-kdrug*(tfirst))/(0.1*Cdoxmax);
     U2=k*Cdox*exp(-kdrug*(tsecond))/(0.1*Cdoxmax);
     U = horzcat(U1(1:end-1), U2);
+    N0 = traj2sum(i).Nmean(1);
     % Run the model forward for the two different U(t)s and times of drug
     % for each variest treatment interval
     [Nsri, tcrit, Ncrit] = fwd_Greene_model2(p, ttot, N0, U, dt, tdrug);
     
 
-subplot(2, length(repeat_trts)/2, i)
+subplot(1, length(repeat_trts), i)
 
     hold on
     plot (ttot, Nsri(:,1),'b-' ,'LineWidth',2)
-    plot(ttot, Nsri(:,2), 'g-', 'LineWidth',2)
-    plot(ttot, Nsri(:,3), 'r-', 'LineWidth', 2)
-    plot(tvec, Nmean,'k.', 'LineWidth', 2)
-    %plot(tvec, Nmean + Nstd, 'color', 'k')
-    %plot(tvec, Nmean - Nstd, 'color', 'k')
+    %plot(ttot, Nsri(:,2), 'g-', 'LineWidth',2)
+    %plot(ttot, Nsri(:,3), 'r-', 'LineWidth', 2)
+    plot(traj2sum(i).tvec, traj2sum(i).Nmean,'k.', 'LineWidth', 2)
+    plot(traj2sum(i).tvec, traj2sum(i).Nmean + traj2sum(i).Nstd, 'color', 'k')
+    plot(traj2sum(i).tvec, traj2sum(i).Nmean - traj2sum(i).Nstd, 'color', 'k')
     title (['Treatment Interval=', num2str(repeat_trts(i)), ' days'])
     xlabel ('time (hours)')
     ylabel ('N(t)')
-    legend ('N(t)', 'S(t)', 'R(t)','N(t) data', '95% CI', 'Location', 'NorthWest')
-    legend boxoff
+    %legend ('N(t)', 'S(t)', 'R(t)','N(t) data', '95% CI', 'Location', 'NorthWest')
+    %legend boxoff
     set(gca,'FontSize',20,'LineWidth',1.5)
-    xlim([0 ttot(end)])
-    ylim([0 0.7*carcapNf])
+    %xlim([0 24*6])
+    %xlim([0 traj2sum(i).tvec(end)])
+    %ylim([0 0.7*carcapNf])
 end
+%% Compare the repeat treatment with the initial treatment data
+figure
+plot(trajsum(7).tfit, trajsum(7).Nmean./trajsum(7).Nmean(1), 'k.', 'LineWidth',2)
+hold on
+plot(traj2sum(3).tvec, traj2sum(3).Nmean./traj2sum(3).Nmean(1), 'r.', 'LineWidth',2)
+plot(trajsum(7).tfit, trajsum(7).Nmean./trajsum(7).Nmean(1) + trajsum(7).Nstd./trajsum(7).Nmean(1), 'color', 'k')
+plot(trajsum(7).tfit, trajsum(7).Nmean./trajsum(7).Nmean(1) - trajsum(7).Nstd./trajsum(7).Nmean(1), 'color', 'k')
+plot(traj2sum(3).tvec, traj2sum(3).Nmean./traj2sum(3).Nmean(1) + traj2sum(3).Nstd./traj2sum(3).Nmean(1), 'color', 'r')
+plot(traj2sum(3).tvec, traj2sum(3).Nmean./traj2sum(3).Nmean(1) - traj2sum(3).Nstd./traj2sum(3).Nmean(1), 'color', 'r')
+set(gca,'FontSize',20,'LineWidth',1.5)
+xlabel('time (hours)')
+ylabel('N(t)/N_{0}')
+legend('First treatment data', 'Repeat treat data', 'Location', 'NorthWest')
+legend boxoff
+xlim([0 16*24])
+title('Comparison of first 16 days of 200 nM pulse treat data')
 
 %% Repeat this but add in a cone of uncertainty around N...
 
@@ -179,7 +238,6 @@ pup = [CIphi0(1), carcapNf, CIrs(2), CIalpha(2), CIzr(2), CIds(1), CIzd(1)];
 plow = [CIphi0(2), carcapNf, CIrs(1), CIalpha(1), CIzr(1), CIds(2), CIzd(2)];
 %
 
-repeat_trts = [4 6 8 10]; % days at which the treatment was repeated
   Cdox = 200;
   Cdoxmax = 1000;
 figure;

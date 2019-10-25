@@ -70,13 +70,13 @@ loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-y
 %What if the objective function was just minimized error??
 weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
 weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2)./(phisigfit.^2));
-objfun= @(phat)((1-lambda)*weightederrN(phat) + lambda*weightederrphi(phat));
+objfun= @(phat)(1-lambda).*weightederrN(phat) + lambda*weightederrphi(phat);
 
 objfunLL=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
 LB = pfxform(pbounds(:,1)');
 UB = pfxform(pbounds(:,2)');
 % This should make the search more exhaustive...
-options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e5, 'TolFun', 1e-6, 'TolX', 1e-6);
+options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e6, 'TolFun', 1e-6, 'TolX', 1e-6);
 phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB, options);
 pbest = pbxform(phatbest);
 
