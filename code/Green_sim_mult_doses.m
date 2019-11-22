@@ -5,75 +5,146 @@
 
 close all; clear all; clc
 %%
+ptest = load('../out/ptest.mat');
+ptest = struct2cell(ptest);
+ptest = cell2mat(ptest);
+P = num2cell(ptest);
+[phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot] = deal(P{:});
+% reset the parametes to be near these values but not them exactly
+phi0 = 0.8;
+carcapN = 5e4;
+rs = 0.023;
+alpha = 0.0;
+zr = 0.2;
+ds = 0.05;
+zd = 0.1;
+Cdoxmax = 1000;
+% Set up the conditions to simulate with pulsed treatment 
+
 dt = 1; % this corresponds to hours
-carcap = 5e4; % K
-t1 = 336; % 2 weeks
-t1vec = (0:4:t1)';
 
-S(1)=2e3; % set initial conditions (assume all cells sensitive to start)
-R(1) = 0; 
-Cdox(1) = 50; % nm doxorubicin
-rs = 0.0287;
-rr = 0.01;
-ds = 0.0015;
-dr = 0;
-alpha = 0.0001;
-kdrug = 0.015;
-N(1) = S(1)+R(1);
-t = 1; % time in hours
-k = 1; 
+t1 = 168; % 2 weeks
+
+dt = 1;
+tdrug = 1;
+Cdox = 200;
+tgen = 0:1:t1;
+U1=k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+N0 = 3000;
+ pi = [phi0, carcapN,rs, alpha, zr, ds,zd];
+ %
+tvec = horzcat(tgen(1:end-1), tgen(1:end-1) + t1, tgen (1:end-1)+ 2*t1, tgen + 3*t1);
+tdrug = [tgen(1); (tgen(1) + tgen(end)); tgen(end)+tgen(end)];
+% set original U as U1 to indicate first dose
+U2=k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+U3=k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+U4=k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+U = horzcat(U1(1:end-1), U2(1:end-1), U3(1:end-1), U4);
+
+[Nsrpulse, tcrit, Ncrit] = fwd_Greene_model2(pi, tvec, N0, U, dt, tdrug);
+
+Ucons = mean(U)*ones(length(U));
+[Nsrcons, tcrit, Ncrit] = fwd_Greene_model2(pi, tvec, N0, Ucons, dt, tdrug);
+% Add to the trajsum data structure the model fit for that Cdox (whether it
 
 
-S0 = S(1);
-R0 = R(1);
-pset = [S0, R0, rs, carcap];
-pfit = [ alpha, rr, ds, dr];
-p = [ pset, pfit];
-%% Run to run simulations on fitted parameters
-pload =  load('../out/pall.mat');
-pload = struct2cell(pload);
-pload = cell2mat(pload);
-
-P = num2cell(pload); 
- [rs, carcap, props, dr, alpha, rr, ds]= deal(P{:}); % our parameters
-
-pset = [S0, R0, rs, carcap];
-pfit = [ alpha, rr, ds, dr];
-p = [ pset, pfit];
-%%
-% U(t) for a single pulse dose
-ttest = 0:dt:t1;
-U1=(k*Cdox*exp(-kdrug*(ttest)))'; % minus one because t starts at 1
-tdrug1 =1;
-
-[Nsr, tcrit, Ncrit] = fwd_Greene_model(p, t1vec, U1, dt, tdrug1);
-N = Nsr(:,1);
-S = Nsr(:,2);
-R = Nsr(:,3);
-%% Plot for single dose for two weeks of monitoring
 
 figure;
-subplot(1,2,1)
-plot(t1vec,N,'LineWidth',3, 'color','b');
+subplot(2,1,2)
+plot(tvec,Nsrpulse(:,1),'LineWidth',3, 'color','b');
 hold on
-plot(t1vec, S, 'LineWidth', 3,'color', 'g')
-plot(t1vec, R, 'LineWidth', 3, 'color', 'r')
-plot(tcrit, Ncrit, 'k*')
-legend('total cell number', 'sensitive', 'resistant', 'critical N', 'Location', 'NorthWest')
+plot(tvec,Nsrcons(:,1), 'LineWidth', 3, 'color', 'k')
+%plot(tvec, Nsrulse(:,2), 'LineWidth', 3,'color', 'g')
+%plot(tvec, Nsrpulse(:,3), 'LineWidth', 3, 'color', 'r')
+%plot(tcrit, Ncrit, 'k*', 'LineWidth', 3)
+plot([0 tvec(end)], [2*N0, 2*N0], 'r--', 'LineWidth', 2)
+%legend('total cell number', 'sensitive', 'resistant', 'critical N', 'Location', 'NorthWest')
+legend('pulsed', 'constant', 'Location', 'NorthWest')
 legend boxoff
-xlim([ 0 t1vec(end)])
-xlabel('Time (hours)','FontSize',20)
-ylabel('Total Cell Number','FontSize',20)
-title('Single pulse dose response (2 weeks)')
+xlim([ 0 tvec(end)])
+ylim([ 0 3*N0])
+xlabel('time (hours)','FontSize',20)
+ylabel('N(t)','FontSize',20)
+title(['\alpha= ', num2str(alpha)])
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+subplot(2,1,1)
+plot(tvec, U,'LineWidth',3, 'color', 'b')
+hold on
+plot(tvec, Ucons, 'LineWidth', 3, 'color', 'k')
+xlim([ 0 tvec(end)])
+ylim([ 0 1.3])
+xlabel('time (hours)','FontSize',20)
+ylabel('Effective dose u(t)','FontSize',20)
+legend('pulsed', 'constant')
+legend boxoff 
+set(gca,'FontSize',20,'LineWidth',1.5)
+%title('Pulse of 200 nM dox every week')
+
+%% Maximum achievable critical time versus alpha 
+pstar = pi;
+alphavec = linspace(0,0.01, 2);
+dosevec = linspace(0, 1000, 10);
+tcritstar = [];
+for i = 1:length(alphavec)
+    pstar(4) = alphavec(i);
+    for j = 1:length(dosevec)
+        tgen = 0:1:5*t1;
+        Uj=k*dosevec(j)*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
+        [Nsri, tcritstar(i,j), Ncrit] = fwd_Greene_model2(pstar,tgen, N0, Uj, dt, 0);
+    end
+end 
+
+figure;
+for i = 1:length(alphavec)
+    plot(dosevec, tcritstar(i,:), '*-', 'LineWidth', 2)
+    hold on
+end
+xlabel('[Dox]')
+ylabel('Critical time')
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+figure;
+for j = 1:length(dosevec)
+    plot(alphavec, tcritstar(:,j), '*-', 'LineWidth', 2)
+    hold on
+end
+xlabel('\alpha')
+ylabel('Critical time')
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+%% Plot just the first two doses
+figure;
+subplot(1,2,1)
+plot(tvec,Nsrpulse(:,1),'LineWidth',3, 'color','b');
+hold on
+%plot(tvec,Nsrcons(:,1), 'LineWidth', 3, 'color', 'k')
+plot(tvec, Nsrpulse(:,2), 'LineWidth', 3,'color', 'g')
+plot(tvec, Nsrpulse(:,3), 'LineWidth', 3, 'color', 'r')
+%plot(tcrit, Ncrit, 'k*', 'LineWidth', 3)
+%plot([0 tvec(end)], [2*N0, 2*N0], 'r--', 'LineWidth', 2)
+%legend('total cell number', 'sensitive', 'resistant', 'critical N', 'Location', 'NorthWest')
+legend('N(t)', 'S(t)', 'R(t)', 'Location', 'NorthWest')
+legend boxoff
+xlim([ 0 2*t1])
+%ylim([ 0 3*N0])
+xlabel('time (hours)','FontSize',20)
+ylabel('Number of cells','FontSize',20)
+%title(['\alpha= ', num2str(alpha)])
 set(gca,'FontSize',20,'LineWidth',1.5)
 
 subplot(1,2,2)
-plot(ttest, U1,'LineWidth',3)
-xlim([ 0 t1vec(end)])
-xlabel('Time (hours)','FontSize',20)
-ylabel('Effective dose','FontSize',20)
+plot(tvec, U,'LineWidth',3)
+hold on
+%plot(tvec, Ucons, 'LineWidth', 3, 'color', 'k')
+xlim([ 0 2*t1-1])
+ylim([ 0 1.3])
+xlabel('time (hours)','FontSize',20)
+ylabel('Effective dose (u(t))','FontSize',20)
+%legend('pulsed', 'constant')
+%legend boxoff 
 set(gca,'FontSize',20,'LineWidth',1.5)
-title('Pulse of 75 nM dox')
+%title('Pulse of 200 nM dox every week')
 %% Simulate second dose at two weeks
 
 t2vec = (0:4:336)'; %

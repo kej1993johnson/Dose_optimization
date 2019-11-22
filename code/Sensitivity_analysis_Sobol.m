@@ -100,7 +100,7 @@ xlim([-50,tscRNAseq])
 % phenotypic composition at the time of treatment
 Cdoxmax = 1000;
 Cdoxvec = [0, 75, 200, 500]; % find tcrit and phi for the relevant experimental dox concentrations
-%Cdoxvec =[0:10:500];
+Cdoxvec =[0:10:500];
 %Cdoxvec = 200; % make this just one output
 
 tvec1=[0:3:600];
@@ -178,7 +178,7 @@ plot(Cdoxvec, phi_sc, 'm-', 'LineWidth', 2)
 set(gca,'FontSize',20,'LineWidth',1.5)
 xlabel('[Dox]')
 ylabel('\phi_{s}')
-title('\phi_{s} @ t_{crit}')
+title('\phi_{s}(t=t_{crit})')
 xlim([0 Cdoxvec(end)])
 %% Plot some example trajectories
 
@@ -221,7 +221,7 @@ par = ptest(1:8);
 parlow = par/2;
 parhigh = par*2;
 
-paramnames = {'\phi_{s}(0)', 'K1', 'K2', 'r_{s}', '\alpha', '(rr/rs)', 'd_{s}', '(dr/ds)'};
+paramnames = {'\phi_{s}(0)', 'K_{N}', 'K_{\phi}', 'r_{s}', '\alpha', 'r_{r}/r_{s} ratio', 'd_{s}', 'd_{r}/d_{s} ratio'};
 
 Npar = length(par);
 
@@ -330,7 +330,7 @@ set(gca,'FontSize',16)
 % We will separately use modelfuntcrit and modelfunphisc to generate our
 % model output trajectoriies
 
-N=1e5;
+N=5e3;
 % 1. Generate two sets of random numbers on (0,1)
 Xmat = rand([Npar N]);
 Zmat = rand([Npar N]);
@@ -338,7 +338,7 @@ Zmat = rand([Npar N]);
 % I am a little confused what this means, but I think I can likely assume
 % that the distribution on parameters is uniformly distributed between soem
 % reasonable upper and lower bounds (that I set)
-paramnames = {'\phi_{s}(0)', 'K1', 'K2', 'r_{s}', '\alpha', '(rr/rs)', 'd_{s}', '(dr/ds)'};
+%paramnames = {'\phi_{s}(0)', 'K1', 'K2', 'r_{s}', '\alpha', '(rr/rs)', 'd_{s}', '(dr/ds)'};
 % Set upper and lower bounds of these parameters and then sample from it
 pbounds(1,:)= [0,1]; % phis0
 pbounds(2,:) = [3e4, 7e4]; % carrying capacity of cells in a 96 well
@@ -350,8 +350,8 @@ pbounds(7,:) = [0.01, 0.1]; % ds
 pbounds(8,:)= [0, 1]; % %resistant to sensitive cell death rate ratio 
 % How to sample from uniform distribution between upper and lower values
 for i = 1:N
-Xmatp(:,i) = Xmat(:,i).*(pbounds(:,2)-pbounds(:,1));
-Zmatp(:,i) = Zmat(:,i).*(pbounds(:,2)-pbounds(:,1));
+Xmatp(:,i) = pbounds(:,1) + Xmat(:,i).*(pbounds(:,2)-pbounds(:,1));
+Zmatp(:,i) = pbounds(:,1) + Zmat(:,i).*(pbounds(:,2)-pbounds(:,1));
 end
 % Run N simulations to calculate the outputs' mean and variance with first
 % set of samples (Xmatp)

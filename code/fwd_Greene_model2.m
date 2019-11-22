@@ -51,6 +51,9 @@ for i = 1:length(tdrug)
     ihigh = find(ttot>=tdrug(i));% all indices after this dose
     ind = find(ismember(ilow, ihigh));
     Npd = N(ind);
+    if isempty(Npd)
+        tcrit(i) = 0;
+    else
     Ncrit(i) = 2*Npd(1);
     %Ncrit(i) = 2*N0;
     icrit = find(Npd>Ncrit(i),1, 'first');
