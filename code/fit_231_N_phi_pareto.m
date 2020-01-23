@@ -266,11 +266,41 @@ pbounds =  [ 0,1; 0,1; 0,1; 0,1; 0,1; 0,1];
 %Give this function both Ntrt and phitrt
 % can toggle the amount that we weigh each portion..
 % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
-lambda = 1-(length(phitrt)./length(ydatafit));
+lambda = 0.5;
+%% RUN TO FIT ON N(t) only
+lambda = 0;
+
+%% Try multistart function with a range of initial guesses 
+% Set your range of start values
+thetarange = [0.7, 1; 0.02, 0.03; 0,1; 0.01 0.5; 0 0.1; 0,1];
+[pbestvec,N_model, phi_model, negLLvec, err_N, err_phi] = fit_fxn_Greenephi_Nms(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta,thetarange, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
+% Want to output the different parameter sets from the multistart
+% optimization 
+[negLL, ind] = min(negLLvec);
+pbest = pbestvec(ind, :);
+
+% Plot parameter distributions from multistart
+paramnames = {'\phi_{0}','r_{S}', 'r_{R}/r_{S} ratio', '\alpha', 'd_{S}', 'd_{R}/d_{S} ratio'};
+figure;
+for i = 1:length(pbest)
+    subplot(1,length(pbest), i)
+    plot(pbestvec(:,i), negLLvec,'o', 'LineWidth',2)
+    hold on
+    %xlim([min(lambdavec), max(lambdavec)])
+    xlabel('parameter value')
+    ylabel('J(\theta)')
+    title(paramnames(i));
+    set(gca,'FontSize',20,'LineWidth',1.5)
+    ylim([ 0 100])
+end
+
+
+%% Old single start function- DON'T RUN
 % This function internally instead of actually fitting rr and dr, fits the ratio 
 [pbest,N_model, phi_model, negLL, err_N, err_phi] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % Adjust transformed parameter estimates so we capture estimated value
 % of rr and dr (since these are what we saved).
+%% 
 phi0 = pbest(1);
 rs =pbest(2);
 alpha = pbest(3);
@@ -318,7 +348,7 @@ legend(' 0 nM', '75 nM', '200 nM', '500 nM', 'model fit(\lambda*)', 'Location', 
 %legend ( 'model fit N(t), \lambda*', 'N(t) data', 'Location', 'NorthWest')
 legend box off
 %title (['N(t), CCC_{N}=', num2str(CCC_vec(1))])
-set(gca,'FontSize',20,'LineWidth',1.5)
+set(gca,'FontSize',26,'LineWidth',1.5)
 
 figure;
 %plot(tbot, phitrt, 'g*', 'LineWidth',5)
@@ -330,11 +360,11 @@ errorbar(tbot, phitrt, 1.96*phisigfit,  'go', 'LineWidth', 3)
 %plot(tbot, phitrt - 1.96*phisigfit, 'k.')
 %plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
 xlabel ('time (hours)')
-ylabel(' \phi_{sens}(t)')
-legend ('model fit \phi_{sens}(t), \lambda*', '\phi_{sens}(t) data', 'Location', 'NorthWest')
+ylabel(' \phi(t)')
+legend ('model fit \phi(t), \lambda*', '\phi(t) data', 'Location', 'NorthEast')
 legend box off
 %title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(2))])
-set(gca,'FontSize',20,'LineWidth',1.5)
+set(gca,'FontSize',26,'LineWidth',1.5)
 ylim([0 1.2])
 xlim([0 1656])
 %% Model vs measurement N(t) colored by dose
@@ -351,7 +381,7 @@ legend(' 0 nM', '75 nM', '200 nM', '500 nM', 'Location', 'NorthWest')
 legend boxoff
 xlim([0 max(ydatafit)])
 ylim([0 max(ydatafit)])
-set(gca,'FontSize',20,'LineWidth',1.5)
+set(gca,'FontSize',26,'LineWidth',1.5)
 xlabel ('Measured N(t)')
 ylabel('Calibrated N(t)')
 %title(['CCC_{N(t)} calibrated=', num2str(CCC_vec(1))])
@@ -379,7 +409,7 @@ plot(Cdoxvec, tcrit, 'k-', 'LineWidth', 3)
 CCC_calib = f_CCC([tcrit(dosevec)', tcritcalib], 0.05)
 legend(' 0 nM', '75 nM', '200 nM', '500 nM', 'model t_{crit}(\lambda*)', 'Location', 'NorthWest')
 legend boxoff
-set(gca,'FontSize',20,'LineWidth',1.5)
+set(gca,'FontSize',26,'LineWidth',1.5)
 xlabel('[Dox]')
 xlim([ 0 550])
 ylabel('t_{crit}')
@@ -402,7 +432,7 @@ xlabel('measured t_{crit} (hours)')
 ylabel('predicted t_{crit} (hours)')
 xlim([ 0 max(tcrit)])
 ylim([0 max(tcrit)])
-set(gca,'FontSize',20,'LineWidth',1.5)
+set(gca,'FontSize',26,'LineWidth',1.5)
 CCC_pred = f_CCC([tcritpred, tcritlist'], 0.05)
 %title(['CCC_{tcrit} predicted=', num2str(CCC_pred)])
 
@@ -426,15 +456,25 @@ title(['CCC_{tcrit} calibrated=', num2str(CCC_calib)])
 
 %% Now flip through, varying lambda each fit
 % Eventually, we want to get more of these
-lambdamid = 1-(length(phitrt)./length(ydatafit));
-lambdaN = 1-(length(phitrt)./(2*length(ydatafit)));
-lambdaphi = 1-(2.*length(phitrt)./length(ydatafit));
-lambdavec = linspace(lambdaphi, lambdaN, 1000);
-lambdavec = lambdavec'
-
+lambdaN = 0;
+lambdaphi = 1;
+lambdavec = linspace(lambdaN, lambdaphi, 1000);
+lambdavec = lambdavec';
+[vals, ord] = sort(abs(lambdavec-lambda));
+lambdavec =lambdavec(ord); % order the lambdas to search by decreasing distance from the center
+%% Use homotypic continuation to find new pareto front parameter sets
+%since we already performed randomization of the initial guess over a rnage
+%of reasonable thetas, we will start there 
 for i = 1:length(lambdavec)
     lambdai = lambdavec(i);
-    pguess = theta;
+    % Set the initial guess of the new lambda as the best fitting value
+    % from previous lambda
+    if i ==1
+    pguess = pbest;
+    else
+    pguess = pbesti(i-1,:);
+    end
+    
     [pbesti(i,:),N_modeli(:,i), phi_modeli(:,i), negLLi(:,i), weightederr_Ni, weightederr_phii] = fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, pguess, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambdai, pbounds);
     sumsqerrN(i,1) =weightederr_Ni;
     sumsqerrphi(i,1) =weightederr_phii;
@@ -456,9 +496,9 @@ hcb=colorbar;
 title(hcb, '\lambda')
 xlabel('E_{\phi} (weighted sum-of-squares error in \phi(t))')
 ylabel('E_{N} (weighted sum-of-squares error in N(t))')
-set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
-xlim([ .8 1e2])
-ylim([ 1e4 2e4])
+set(gca,'FontSize',26,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
+%xlim([ .8 1e2])
+%ylim([ 1e4 2e4])
 legend('\theta*', 'Location', 'NorthWest')
 legend boxoff
 
@@ -486,8 +526,8 @@ set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
 %title('Parameter sets filtered by CCC')
 % xlim([ 1 1e2])
 % ylim([ 1.3e4 2e4])
-xlim([ .8 1e2])
-ylim([ 1e4 2e4])
+%xlim([ .8 1e2])
+%ylim([ 1e4 2e4])
 
 %% Try something different, instead, find pareto solutions iteratively
 indkeep = [];
@@ -505,7 +545,7 @@ for i = 1:height(pareto_filtered)
 end
 %% Save the pareto solutions
 pareto_in = pareto_filtered(indkeep, :);
-%writetable(pareto_in,'../out/pbest_table.csv')
+writetable(pareto_in,'../out/pbest_table.csv')
 %% Plot the parameter sets that we keep
 figure;
 scatter(pareto_in.sumsqerrphi, pareto_in.sumsqerrN,[], pareto_in.lambdavec, 'filled')
@@ -523,35 +563,35 @@ xlabel('E_{\phi}')
 %xlim([min(sumsqerrN), max(sumsqerrN)])
 %xlim([ 1 0.5e2])
 %ylim([ 1.3e4 2e4])
-xlim([ .8 1e2])
+%xlim([ .8 1e2])
 ylim([ 1e4 2e4])
 
 %set(gca,'FontSize',20,'LineWidth',1.5)
 set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
-legend('\theta_{pareto front}', '\theta*', 'non-pareto \theta', 'Location', 'NorthWest')
+legend('\theta_{pareto front}', '\theta*', 'non-pareto \theta', 'Location', 'NorthEast')
 legend boxoff
 %title('Parameter sets within pareto boundary')
-
+%%
 figure;
 scatter(pareto_in.sumsqerrphi, pareto_in.sumsqerrN,[], pareto_in.lambdavec, 'filled')
 hold on
 plot(err_phi, err_N, 'r*', 'LineWidth',8)
 hcb=colorbar;
 title(hcb,'\lambda')
-ylabel ('E_{N} (weighted sum-of-squares error in N(t))')
-xlabel('E_{\phi} (weighted sum-of-squares error in \phi(t))')
+ylabel ('E_{N} (error in N(t))')
+xlabel('E_{\phi} (error in \phi(t))')
 %ylim([ min(sumsqerrphi), max(sumsqerrphi)])
 %xlim([min(sumsqerrN), max(sumsqerrN)])
 xlim([ min(pareto_in.sumsqerrphi) max(pareto_in.sumsqerrphi)])
 ylim([ min(pareto_in.sumsqerrN) max(pareto_in.sumsqerrN)])
 %set(gca,'FontSize',20,'LineWidth',1.5)
-set(gca,'FontSize',20,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
+set(gca,'FontSize',24,'LineWidth',1.5, 'Xscale', 'log', 'Yscale', 'log')
 legend('\theta_{pareto front}', '\theta*', 'non-pareto \theta', 'Location', 'NorthEast')
 legend boxoff
 %title('Parameter sets within pareto boundary')
 
 %% Plot parameter distributions
-paramnames = {'\phi_{0}','r_{s}', 'r_{r}/r_{s} ratio', '\alpha', 'd_{s}', 'd_{r}/d_{s} ratio'};
+%paramnames = {'\phi_{0}','r_{s}', 'r_{r}/r_{s} ratio', '\alpha', 'd_{s}', 'd_{r}/d_{s} ratio'};
 figure;
 for i = 1:length(pbest)
     subplot(2,length(pbest), i)
@@ -560,10 +600,10 @@ for i = 1:length(pbest)
     title(hcb, 'CCC_{N}')
     set(hcb, 'Ticks', [])
     hold on
-    xlim([min(lambdavec), max(lambdavec)])
+    %xlim([min(lambdavec), max(lambdavec)])
     xlabel('\lambda')
-    ylabel('parameter value')
-    title(paramnames(i));
+    %ylabel('parameter value')
+    ylabel(paramnames(i));
     set(gca,'FontSize',20,'LineWidth',1.5, 'XTick', [], 'YTick', [])
     subplot(2,length(pbest), i+length(pbest))
     scatter(pareto_in.lambdavec, pareto_in.pbesti(:, i),[],pareto_in.CCC_phi, 'filled')
@@ -571,16 +611,16 @@ for i = 1:length(pbest)
     title(hcb, 'CCC_{\phi}')
     set(hcb, 'Ticks', [])
     hold on
-    xlim([min(lambdavec), max(lambdavec)])
+    %xlim([min(lambdavec), max(lambdavec)])
     xlabel('\lambda')
-    ylabel('parameter value')
-    title(paramnames(i));
+    %ylabel('parameter value')
+    ylabel(paramnames(i));
     set(gca,'FontSize',20,'LineWidth',1.5, 'XTick', [], 'Ytick', [])
 end
 
 %% Make histograms of parameter distributions
 paramlabs = {'\phi_{0}*','r_{s}*', 'r_{r}/r_{s}*', '\alpha*', 'd_{s}*', 'd_{r}/d_{s}*'};
-paramnames = {' \phi_{0}','r_{s}', 'r_{r}/r_{s}', '\alpha', 'd_{s}', 'd_{r}/d_{s}'};
+%paramnames = {' \phi_{0}','r_{s}', 'r_{r}/r_{s}', '\alpha', 'd_{s}', 'd_{r}/d_{s}'};
 CI = load('../out/CIpbest.mat')
 CI = struct2cell(CI);
 CI = cell2mat(CI);
@@ -595,21 +635,85 @@ for i = 1:length(pbest)
     histogram(psets(:, i), 25, 'Normalization', 'probability')
     hold on
     plot([pbest(i)], [0], 'r*', 'LineWidth', 10)
-    plot([ CI(i,1) CI(i,1)], [0 0.4], 'g-', 'LineWidth', 3)
-    plot([ CI(i,2) CI(i,2)], [0 0.4], 'g-', 'LineWidth', 3)
+    %plot([ CI(i,1) CI(i,1)], [0 0.4], 'g-', 'LineWidth', 3)
+    %plot([ CI(i,2) CI(i,2)], [0 0.4], 'g-', 'LineWidth', 3)
     %plot(mean(param_table{:,i}),0, 'g*', 'LineWidth', 3)
     %plot(median(param_table{:,i}),0, 'm*', 'LineWidth', 3)
     hold on
     %xlim([0.99*CI(i,1), 1.1*CI(i,2)])
-    ylim([ 0 0.4])
+    %ylim([ 0 0.4])
     xlabel(paramnames(i))
     ylabel('probability')
     %title(paramnames(i));
-    legend([paramlabs(i)], 'FontSize', 14)
-    legend boxoff
-    set(gca,'FontSize',20,'LineWidth',1.5)
+    %legend([paramlabs(i)], 'FontSize', 14)
+    %legend boxoff
+    set(gca,'FontSize',24,'LineWidth',1.5)
     
 end
+%% Plot some examples of fits along the pareto front
+% find the highest weighting N data set
+[minlam, indmin] = min(pareto_in.lambdavec);
+[maxlam, indmax] = max(pareto_in.lambdavec);
+
+for i = 1:length(trajsum)
+ N_modeliNmin = [];  
+N_modeliNmin = simmodelgreene2(pareto_in.pbesti(indmin,:), trajsum(i).tvec, trajsum(i).Nmean(1), pset, trajsum(i).U, [length(trajsum(i).Nmean) length(trajsum(i).U)], pfitID, psetID);
+NmodelN = simmodelgreene2(pbest, trajsum(i).tvec, trajsum(i).Nmean(1), pset, trajsum(i).U, [length(trajsum(i).Nmean) length(trajsum(i).U)], pfitID, psetID);
+N_modeliNmax = simmodelgreene2(pareto_in.pbesti(indmax,:), trajsum(i).tvec, trajsum(i).Nmean(1), pset, trajsum(i).U, [length(trajsum(i).Nmean) length(trajsum(i).U)], pfitID, psetID);
+trajsum(i).NmodelN = NmodelN;
+trajsum(i).NmodelNmin = N_modeliNmin;
+trajsum(i).NmodelNmax = N_modeliNmax;
+end
+phi_model_longNmin= simmodelgreenephi2(pareto_in.pbesti(indmin,:), tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
+phi_model_longN= simmodelgreenephi2(pbest, tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
+phi_model_longNmax= simmodelgreenephi2(pareto_in.pbesti(indmax,:), tgen, N0phi, pset, Ub, [length(tgen) length(tgen)], pfitID, psetID);
+figure;
+hold on
+for j = 1:length(dosevec)
+    i = dosevec(j);
+plot(trajsum(i).tvec, trajsum(i).NmodelN, 'k-', 'LineWidth', 2)
+hold on
+plot(trajsum(i).tvec, trajsum(i).NmodelNmin, 'b-', 'LineWidth', 2)
+plot(trajsum(i).tvec, trajsum(i).NmodelNmax, 'r-', 'LineWidth', 2)
+   
+end
+for j = 1:length(dosevec)
+    i = dosevec(j);
+    errorbar(trajsum(i).tvec, trajsum(i).Nmean, 1.96*trajsum(i).Nstd, '*','color', trajsum(i).color')
+    
+end
+
+xlabel ('time (hours)')
+ylabel(' N(t)')
+ylim([ 0 5e4])
+xlim([0 trajsum(i).tvec(end)])
+legend('model fit(\lambda=\lambda*=0.5)', 'model fit(\lambda=0.3)','model fit(\lambda=0.9)' , 'Location', 'NorthEast')
+%legend ( 'model fit N(t), \lambda*', 'N(t) data', 'Location', 'NorthWest')
+legend box off
+%title (['N(t), CCC_{N}=', num2str(CCC_vec(1))])
+set(gca,'FontSize',20,'LineWidth',1.5)
+
+figure;
+%plot(tbot, phitrt, 'g*', 'LineWidth',5)
+hold on
+plot(tgen, phi_model_longN,'k-', 'LineWidth',3)
+plot(tgen, phi_model_longNmin,'b-', 'LineWidth',3)
+plot(tgen, phi_model_longNmax,'r-', 'LineWidth',3)
+errorbar(tbot, phitrt, 1.96*phisigfit,  'go', 'LineWidth', 3)
+
+%plot(tbot, phitrt + 1.96*phisigfit, 'k.')
+%plot(tbot, phitrt - 1.96*phisigfit, 'k.')
+%plot(tbot, modelfunphi(pbestf), 'r', 'LineWidth', 2)
+xlabel ('time (hours)')
+ylabel(' \phi_{sens}(t)')
+legend ('\lambda=\lambda*=0.5', '\lambda=0.3','\lambda = 0.9','\phi_{sens}(t) data', 'Location', 'NorthWest')
+legend box off
+%title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(2))])
+set(gca,'FontSize',20,'LineWidth',1.5)
+ylim([0 1.2])
+xlim([ 0 1656])
+
+
 
 %% REPEAT BUT TRY Only using N(t) data 
 lambdatry = 0;

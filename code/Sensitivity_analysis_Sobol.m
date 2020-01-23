@@ -78,13 +78,13 @@ ntrt = phi_est.ncells;
         set(gca,'FontSize',20,'LineWidth',1.5)
  end
  %% Plot experimental data of phi(t)
- sigtech = 1e-2;
+ sigtech = 0.5*1e-1;
 phisigfit = [phitrt.*(1-phitrt)./ntrt] + sigtech;
 figure;
 errorbar(tbot, phitrt, phisigfit, 'g*', 'LineWidth', 3)
 hold on
 errorbar(tbot, 1-phitrt, phisigfit, 'r*', 'LineWidth', 3)
-legend('\phi_{sens}(t)', '\phi_{res}(t)', 'Location', 'Northwest')
+legend('\phi(t)=\phi_{S}(t)', '1-phi(t)=\phi_{R}(t)', 'Location', 'Northwest')
 legend('boxoff')
 ylim([-.1, 1.1])
 set(gca,'FontSize',20,'LineWidth',1.5)
@@ -100,7 +100,7 @@ xlim([-50,tscRNAseq])
 % phenotypic composition at the time of treatment
 Cdoxmax = 1000;
 Cdoxvec = [0, 75, 200, 500]; % find tcrit and phi for the relevant experimental dox concentrations
-Cdoxvec =[0:10:500];
+%Cdoxvec =[0:10:500];
 %Cdoxvec = 200; % make this just one output
 
 tvec1=[0:3:600];
@@ -193,8 +193,8 @@ pex = [0.8, carcapNf, rs, alpha, 0.5, ds, 0.1];
 figure;
 plot(tvec1, Nsrdat(:,1), 'b', 'LineWidth', 4)
 hold on
-plot(tvec1,Nsrdat(:,2), 'g--', 'LineWidth', 2)
-plot(tvec1, Nsrdat(:,3), 'r--', 'LineWidth',2)
+%plot(tvec1,Nsrdat(:,2), 'g-', 'LineWidth', 2)
+%plot(tvec1, Nsrdat(:,3), 'r-', 'LineWidth',2)
 legend('N(t)', 'S(t)', 'R(t)', 'Location', 'Northwest')
 legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
@@ -206,7 +206,7 @@ figure;
 plot(tvec1, (Nsrdat(:,2)./Nsrdat(:,1)), 'g', 'LineWidth', 4)
 hold on
 plot(tvec1, (Nsrdat(:,3)./Nsrdat(:,1)), 'r', 'LineWidth',4)
-legend('\phi_{sens}(t)', '\phi_{res}(t)', 'Location', 'Northwest')
+legend('\phi(t)=\phi_{S}(t)', '1-\phi(t)=\phi_{R}(t)', 'Location', 'Northwest')
 legend boxoff
 set(gca,'FontSize',20,'LineWidth',1.5)
 xlabel('time (hours)')
@@ -444,11 +444,11 @@ end
 %% Make bar graphs of the total effects on for each dose
 
 figure;
-bar(TEcheckt')
+bar(TEtcrit')
 hold on
 plot([0 9], [0.05 0.05], 'r--')
-ylim([0 1])
-xlim([0 9])
+%ylim([0 1])
+%xlim([0 9])
 set(gca,'FontSize',20,'LineWidth',1.5)
 set(gca, 'Xtick', [1:1:8])
 set(gca,'XTickLabel', paramnames)

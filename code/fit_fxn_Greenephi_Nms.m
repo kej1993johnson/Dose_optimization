@@ -1,4 +1,4 @@
-function [pbest,model_N, model_phi, negLL, werr_N,werr_phi] = fit_fxn_Greenephi_Nprof(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
+function [pbestvec,model_N, model_phi, negLLvec, werr_N,werr_phi] = fit_fxn_Greenephi_Nms(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, thetarange, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, lambda, pbounds) 
 %[pbest,model_N, negLL, pbestGD, model_NGD,                      (Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
 % This function needs to redoes the fit by searching for the optimal zr and
 % zd which are the ratios of rr/rs and dr/ds respectively
@@ -56,40 +56,61 @@ pbxform = @(phat)exp(phat);%+vec2curr.*(exp(phat)./(1+exp(phat)));  %'backward' 
 yfxform = @(y)log(y); % 'forward' transform for data and model output
 ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
 
+% Write a loop that will randomly select initial guesses from the bounds of
+% thetarange.
+Nstarts = 100;
+Xmat = rand(length(pfit), Nstarts);
+for i = 1:Nstarts
+% Make a matrix where each column is a initial guess
+thetamat(:,i) = thetarange(:,1) + Xmat(:,i).*(thetarange(:,2)-thetarange(:,1));
+end
 
-theta = pfit; 
 nsampsN= length(ydatafit);
 nsampsphi = length(phitrt);
-% write a function that takes set parameters and fit parameters, combines
-% them, and runs the model forward for the Uvec and 0s provided
-modelfunN = @(p)simmodelgreene2(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID); 
-modelfunphi = @ (p)simmodelgreenephi2(p, tbot, N0phi, pset, Ub, lengthvecphi, pfID, psetID);
-%
 
-loglikelihoodphi= @(phat)sum(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
-loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit).^2);
-%What if the objective function was just minimized error weighted by uncertainty??
-weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
-weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2)./(phisigfit.^2));
-% What if the objective function was just the minimized error, with no
-% weighting?
-%weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2));
-%weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2));
-objfun= @(phat)(1-lambda).*(1./nsampsN).*weightederrN(phat) + lambda.*(1./nsampsphi).*weightederrphi(phat);
-
-%objfunLL=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
-LB = pfxform(pbounds(:,1)');
-UB = pfxform(pbounds(:,2)');
-% This should make the search more exhaustive...
-options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e6, 'TolFun', 1e-6, 'TolX', 1e-6);
-phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB, options);
-pbest = pbxform(phatbest);
+    % write a function that takes set parameters and fit parameters, combines
+    % them, and runs the model forward for the Uvec and 0s provided
+    modelfunN = @(p)simmodelgreene2(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID);
+    modelfunphi = @ (p)simmodelgreenephi2(p, tbot, N0phi, pset, Ub, lengthvecphi, pfID, psetID);
+    %
+    
+    loglikelihoodphi= @(phat)sum(log(2*pi.*(phisigfit).^2)+((modelfunphi(pbxform(phat))-phitrt)./phisigfit).^2);
+    loglikelihoodN= @(phat)sum(log(2*pi.*(sigmafit).^2)+((modelfunN(pbxform(phat))-ydatafit)./sigmafit).^2);
+    %What if the objective function was just minimized error weighted by uncertainty??
+    weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
+    weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2)./(phisigfit.^2));
+    % What if the objective function was just the minimized error, with no
+    % weighting?
+    %weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2));
+    %weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2));
+    % Make your objective function weighted by the number of samples in
+    % each data set
+    objfun= @(phat)(1-lambda).*(1./nsampsN).*weightederrN(phat) + lambda.*(1./nsampsphi).*weightederrphi(phat);
+    
+    %objfunLL=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
+    LB = pfxform(pbounds(:,1)');
+    UB = pfxform(pbounds(:,2)');
+    % This should make the search more exhaustive...
+    options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e6, 'TolFun', 1e-6, 'TolX', 1e-6);
+%INITALIZE with current theta
+    phatbest = fminsearchbnd(objfun, pfxform(pfit), LB, UB, options);
+    negLLvec(1) = objfun(phatbest);
+    pbestvec(1,:) = pbxform(phatbest);   
+    
+for i = 2:Nstarts
+    theta = thetamat(:,i); 
+    
+    phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB, options);
+    negLLvec(i) = objfun(phatbest);
+    pbestvec(i,:) = pbxform(phatbest);
+end
+    [negLLbest, ind] = min(negLLvec);
+    pbest = pbestvec(ind, :);
 
 
 
    % model_N = modelfunN(pbest);
    % model_phi = modelfunphi(pbest);
-   negLL = objfun(phatbest);
    Nfwd = modelfunN(pbest);
     phifwd = modelfunphi(pbest);
     model_N = Nfwd;

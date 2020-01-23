@@ -95,10 +95,10 @@ for i = 1:4
     %text(trajsum(j).tvec(end-10), trajsum(j).Nmean(end)+1000, ['Cdox= ', num2str(trajsum(j).Cdox), ' nM'], 'FontSize', 12)
 
    
-    for m = 1:height(pareto_table)
-    pl2=plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), '-','color', trajsum(j).color, 'LineWidth', 2);
-    pl2.Color(4) = 0.05;
-    end
+%     for m = 1:height(pareto_table)
+%     pl2=plot(trajsum(j).tvec, trajsum(j).Nsrmat(:,m), '-','color', trajsum(j).color, 'LineWidth', 2);
+%     pl2.Color(4) = 0.05;
+%     end
     plot(trajsum(j).tvec, trajsum(j).Nsrmod, 'r-', 'LineWidth', 2)
     text(trajsum(j).tvec(end-10), trajsum(j).Nmean(end)+1000, ['[Dox]= ', num2str(trajsum(j).Cdox), ' nM'], 'FontSize', 14)
 
