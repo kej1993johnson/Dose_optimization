@@ -16,126 +16,139 @@
  %% Load in data
 S = load('../out/trajfit231.mat');
 traj= S.traj;
-% Separate by dose
-uniqdose = [];
-doselist = [];
-for i = 1:length(traj)
-    if ~isempty(traj(i).dosenum)
-    if traj(i).dosenum==1 || traj(i).dosenum == 0
-    doselist =vertcat(doselist, traj(i).dose);
-    end
-    end
-end
-uniqdose= unique(doselist);
-% Make a new structure which combines each dox concentration
- for i = 1:length(uniqdose)
-    trajsum(i).Cdox = [];
-    trajsum(i).Nmat = [];
-    trajsum(i).nreps = 0;
-    trajsum(i).tmat = [];
- end
 
- for i = 1:length(uniqdose) % number of unique seed numbers
-    for j = 1:length(traj)
-        date = {'5-6-19'}; % pull from the same experiment: first treat
-        if contains(traj(j).date, date)  % only want data from this run
-                if traj(j).dose == uniqdose(i)
-                    trajsum(i).nreps = trajsum(i).nreps +1;
-                    trajsum(i).Cdox = traj(j).dose;
-                    trajsum(i).color = traj(j).color;
-                    trajsum(i).tmat = horzcat(trajsum(i).tmat,traj(j).time);
-                    trajsum(i).Nmat = horzcat(trajsum(i).Nmat, traj(j).rawN);
-                    trajsum(i).tdose = traj(j).tdose;
-                end
-        end
-    end
- end
- % Again, clean data for fitting...
- for i = 1:length(trajsum)
-    if i ==1
-    Nfin = 5e4;
-    else
-    Nfin = 3.5e4;
-    end
-     N = trajsum(i).Nmat;
-    t = trajsum(i).tmat;
-    i0 = find(t(:,1)>trajsum(i).tdose,1,'first'); % I arbitrarily search for a maximum in the first 200 hours
-    iend = find(N(:,1)>=Nfin,1, 'first');
-    if ~isempty(iend)
-    tfit = t(i0:iend,:)-t(i0, :); 
-    Nfit = N(i0:iend, :);
-    end
-    if isempty(iend)
-        tfit = t(i0:end, :)-t(i0, :); 
-        Nfit = N(i0:end, :);
-    end
-    
-    trajsum(i).tfit =round(tfit,0);
-    trajsum(i).Nfit =Nfit;
-    trajsum(i).tvec = trajsum(i).tfit(:,1);
-end
-% Test and set U(t) curves
-kdrug = 0.0175;
-k = 0.7;
-dt = 1;
-% input time vectors for each different dose response
-figure;
-for i = 1:length(trajsum)
-    ttest = [];
-    ttest = 0:dt:trajsum(i).tvec(end);
-    Cdox = trajsum(i).Cdox;
-    trajsum(i).U = k*Cdox*exp(-kdrug*(ttest)); 
-    subplot(1, length(trajsum),i)
-    plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
-    ylim([0 300])
-    xlim([ 0 ttest(end)])
-    xlabel('time (hours)')
-    ylabel('Effective dose (U(t))')
-    title([num2str(trajsum(i).Cdox),' nM Dox'])
-end
-% Now find mean and standard deviation vectors
-for i = 1:length(trajsum)
-    trajsum(i).Nmean = mean(trajsum(i).Nfit,2);
-    trajsum(i).tvec = round(trajsum(i).tfit(:,1),0);
-    trajsum(i).Nstd = std(trajsum(i).Nfit,0,2);
-end
-% Plot the average data 
-  figure;
- for i = 1:6%length(trajsum)
-     subplot(2,1,1)
-         plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
-         hold on
-         text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
-         plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
-         plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
-        xlabel('time (hours)')
-        ylabel('N(t)')
-        title('N(t) for different single pulse treatments')
-        dt = 1;
-       subplot(2,1,2)
-       ttest = [];
-       ttest = 0:dt:trajsum(i).tvec(end);
-       plot(ttest, trajsum(i).U,'.', 'color',trajsum(i).color, 'LineWidth',1)
-        hold on
-        xlabel('time (hours)')
-        ylabel('Effective dose U(t)')
-        title('U(t) for different single pulse treatments')
- end
+S = load('../out/trajsumfit231.mat');
+trajsum= S.trajsum;
+pfit = load('../out/pfitN');
+pfit = struct2cell(pfit);
+pfit = cell2mat(pfit);
+P = num2cell(pfit);
+% These are our parameter estimates, which we want to make sure are in our
+% ranges
+[phi0f, rsf, carcapN, alphaf, rrf, dsf, drf, k, kdrug] = deal(P{:});
+pfitf = [phi0f, rsf, alphaf, rrf, dsf, drf];
+% % Separate by dose
+% uniqdose = [];
+% doselist = [];
+% for i = 1:length(traj)
+%     if ~isempty(traj(i).dosenum)
+%     if traj(i).dosenum==1 || traj(i).dosenum == 0
+%     doselist =vertcat(doselist, traj(i).dose);
+%     end
+%     end
+% end
+% uniqdose= unique(doselist);
+% % Make a new structure which combines each dox concentration
+%  for i = 1:length(uniqdose)
+%     trajsum(i).Cdox = [];
+%     trajsum(i).Nmat = [];
+%     trajsum(i).nreps = 0;
+%     trajsum(i).tmat = [];
+%  end
+% 
+%  for i = 1:length(uniqdose) % number of unique seed numbers
+%     for j = 1:length(traj)
+%         date = {'5-6-19'}; % pull from the same experiment: first treat
+%         if contains(traj(j).date, date)  % only want data from this run
+%                 if traj(j).dose == uniqdose(i)
+%                     trajsum(i).nreps = trajsum(i).nreps +1;
+%                     trajsum(i).Cdox = traj(j).dose;
+%                     trajsum(i).color = traj(j).color;
+%                     trajsum(i).tmat = horzcat(trajsum(i).tmat,traj(j).time);
+%                     trajsum(i).Nmat = horzcat(trajsum(i).Nmat, traj(j).rawN);
+%                     trajsum(i).tdose = traj(j).tdose;
+%                 end
+%         end
+%     end
+%  end
+%  % Again, clean data for fitting...
+%  for i = 1:length(trajsum)
+%     if i ==1
+%     Nfin = 5e4;
+%     else
+%     Nfin = 3.5e4;
+%     end
+%      N = trajsum(i).Nmat;
+%     t = trajsum(i).tmat;
+%     i0 = find(t(:,1)>trajsum(i).tdose,1,'first'); % I arbitrarily search for a maximum in the first 200 hours
+%     iend = find(N(:,1)>=Nfin,1, 'first');
+%     if ~isempty(iend)
+%     tfit = t(i0:iend,:)-t(i0, :); 
+%     Nfit = N(i0:iend, :);
+%     end
+%     if isempty(iend)
+%         tfit = t(i0:end, :)-t(i0, :); 
+%         Nfit = N(i0:end, :);
+%     end
+%     
+%     trajsum(i).tfit =round(tfit,0);
+%     trajsum(i).Nfit =Nfit;
+%     trajsum(i).tvec = trajsum(i).tfit(:,1);
+% end
+% % Test and set U(t) curves
+% kdrug = 0.0175*0.75;
+% k = 0.5;
+% dt = 1;
+% % input time vectors for each different dose response
+% figure;
+% for i = 1:length(trajsum)
+%     ttest = [];
+%     ttest = 0:dt:trajsum(i).tvec(end);
+%     Cdox = trajsum(i).Cdox;
+%     trajsum(i).U = k*Cdox*exp(-kdrug*(ttest)); 
+%     subplot(1, length(trajsum),i)
+%     plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
+%     ylim([0 300])
+%     xlim([ 0 ttest(end)])
+%     xlabel('time (hours)')
+%     ylabel('Effective dose (U(t))')
+%     title([num2str(trajsum(i).Cdox),' nM Dox'])
+% end
+% % Now find mean and standard deviation vectors
+% for i = 1:length(trajsum)
+%     trajsum(i).Nmean = mean(trajsum(i).Nfit,2);
+%     trajsum(i).tvec = round(trajsum(i).tfit(:,1),0);
+%     trajsum(i).Nstd = std(trajsum(i).Nfit,0,2);
+% end
+% % Plot the average data 
+%   figure;
+%  for i = 1:6%length(trajsum)
+%      subplot(2,1,1)
+%          plot(trajsum(i).tvec, trajsum(i).Nmean, 'color', trajsum(i).color, 'LineWidth', 2)
+%          hold on
+%          text(trajsum(i).tvec(end-10), trajsum(i).Nmean(end-10), ['C_{dox}= ', num2str(trajsum(i).Cdox),' nM'])
+%          plot(trajsum(i).tvec, trajsum(i).Nmean + trajsum(i).Nstd, 'color', trajsum(i).color)
+%          plot(trajsum(i).tvec, trajsum(i).Nmean - trajsum(i).Nstd, 'color', trajsum(i).color)
+%         xlabel('time (hours)')
+%         ylabel('N(t)')
+%         title('N(t) for different single pulse treatments')
+%         dt = 1;
+%        subplot(2,1,2)
+%        ttest = [];
+%        ttest = 0:dt:trajsum(i).tvec(end);
+%        plot(ttest, trajsum(i).U,'.', 'color',trajsum(i).color, 'LineWidth',1)
+%         hold on
+%         xlabel('time (hours)')
+%         ylabel('Effective dose U(t)')
+%         title('U(t) for different single pulse treatments')
+%  end
 %% Set & store known parameters
 nsamps = 100;
 
 
-phidom =linspace(0.9,1,100);
-rsdom = linspace(1e-3, 1e-2, 100);
+phidom =linspace(0.6,1,100);
+rsdom = linspace(0.15, 0., 100);
 carcapdom = linspace(4.8e4, 5.5e4, 100);
-alphadom = linspace(0, 1e-3, 100);
-rrdom = linspace(1e-4, 5e-3, 100);
-dsdom = linspace(1e-5,1e-4, 100);
+alphadom = linspace(0, 0.2, 100);
+rrdom = linspace(0, 0.1, 100);
+dsdom = linspace(0,0.3, 100);
+drdom = linspace(0,0.2, 100);
+carcapphi = 20e6;
 
 % Make your pbounds the domain of reasonable parameters
-pbounds(:,1)= vertcat(rsdom(1), alphadom(1), rrdom(1), dsdom(1));
-pbounds(:,2) = vertcat(rsdom(end), alphadom(end), rrdom(end), dsdom(end));
-dr = 0;
+pbounds(:,1)= vertcat(rsdom(1), alphadom(1), rrdom(1), dsdom(1), drdom(1));
+pbounds(:,2) = vertcat(rsdom(end), alphadom(end), rrdom(end), dsdom(end), drdom(end));
+
 for i = 1:nsamps
     phi0=randsample(phidom,1);
     rs = randsample(rsdom,1);
@@ -147,12 +160,13 @@ for i = 1:nsamps
         rr=rs;
     end
     ds = randsample(dsdom,1);
+    dr = randsample(drdom,1);
 
-    pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds, dr];
+    pallstore(i,:) = [phi0, rs,carcap, carcapphi, alpha, rr, ds, dr];
     rstar = phi0/(1-phi0);
     puntfstore(i,:) = [carcap];
     % Add dr to the stored pfit
-    pfitstore(i,:) = [ rs, alpha, rr, ds];
+    pfitstore(i,:) = [phi0, rs, alpha, rr, ds, dr];
 end
 %% Generate untreated control data
 % Fit this only to N(t) 
@@ -161,11 +175,12 @@ ytimeunt = trajsum(1).tvec;
 Uunt = trajsum(1).U;
 N0unt = trajsum(1).Nmean(1);
 tdrug = 1;
+dt =1;
 eta=500;
-
+dosevec = [1 3 5]; % SET DOSEVEC TO CURRENT DOSES USED FOR CALIBRATION
 for i = 1:nsamps
     P= num2cell(pallstore(i,:));
-    [phi0, rs, carcap, alpha, rr, ds ,dr]= deal(P{:});
+    [phi0, rs, carcap, carcapphi, alpha, rr, ds ,dr]= deal(P{:});
     S0 = N0unt*phi0;
     R0 = N0unt*(1-phi0);
     P= num2cell(pallstore(i,:));
@@ -188,7 +203,7 @@ for i = 1:nsamps
 end   
 %%
 figure;
-ind = 22;
+ind = 1;
 plot(ytimeunt, Nstoreunt(:,ind), '*')
 hold on
 plot(ytimeunt, Nfitunt(:,ind), '-')
@@ -204,8 +219,8 @@ set(gca,'FontSize',20,'LineWidth',1.5)
 %% Generate dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
 % Change pset to only phi0 and carcap
-psetID = [1, 3, 7];
-pfitID = [2, 4, 5, 6];
+psetID = [3, 4];
+pfitID = [1, 2, 5, 6, 7];
 % Get what we need from real data
 sigmafit = [];
 ytimefit = [];
@@ -213,7 +228,9 @@ N0s = [];
 lengtht = [];
 lengthU = [];
 Uvec = [];
-for i = 2:6%length(trajsum)
+dosevec = [1 3 5];
+for j = 1:3%length(trajsum)
+   i= dosevec(j);
 sigmafit = vertcat(sigmafit,trajsum(i).Nstd(1:end));
 ytimefit = vertcat(ytimefit, trajsum(i).tvec(1:end));
 N0s = vertcat(N0s,trajsum(i).Nmean(1));
@@ -233,19 +250,25 @@ tgen = [0:1:1344];
 tbot = [0; 1200; 1344];
 tbot = [0:4:1344]; % simulate have a pre-treatment and two 
 %post-treatment time points that are both far out
-Ub=k*Cdox*exp(-kdrug*(tgen));
+Cdoxmax = 1000;
+Ub = k*Cdox*exp(-kdrug*(tgen))/(0.1*Cdoxmax);
 lengthvecphi = [length(tbot), length(tgen)];
-lam = 100;
+carcapphi = 20e6;
+ct_int = 0;
+dt =1;
+ %SET THE DATA RESOLUTION ON PHI
+ikeep = 1:1:length(tbot);
 for i = 1:nsamps
     
     P=num2cell(pallstore(i,:));
-    [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
+    [phi0, rs, carcap, carcapphi, alpha, rr, ds, dr]= deal(P{:});
     % again change these so we fit dr
-    pset = [phi0, carcap, dr];
-    pfset = [rs, alpha, rr, ds];
+    pset = [carcap, carcapphi];
+    pfset = [phi0, rs, alpha, rr, ds, dr];
     Ntrt = [];
     phitrt = [];
-    for j = 2:6
+    for m = 1:3
+        j = dosevec(m);
         Nsr = [];
         U = trajsum(j).U;
         tvec = trajsum(j).tvec;
@@ -265,27 +288,30 @@ for i = 1:nsamps
         N0phi = 2e3; % set this because this is what we think we seeded
         S0 = phi0*N0phi;
         R0 = (1-phi0)*N0phi;
-        pit2 = [S0, R0, rs, carcap, alpha, rr, ds, dr];
+        pit2 = [S0, R0, rs, carcapphi, alpha, rr, ds, dr];
         [Nb, ~,~]=fwd_Greene_model(pit2, tbot, Ub, dt, tdrug);
-        Nbnoise=Nb; % set it as this then replace it
-        Nbnoise(:,2:3) = Nb(:,2:3) + normrnd(0, lam,[length(tbot) 2]);
+       for j = 1:length(Nb)
+           if Nb(j,1)==0
+               Nb(j,1)=1;
+           end
+       end
+        sigtech = 1e-2;
+       phisim = (Nb(:,2)./Nb(:,1))+ normrnd(0, sigtech,[length(tbot) 1]);
         % remove negative numbers
-        for j =1:length(Nbnoise)
-            if Nbnoise(j,2) <0
-                Nbnoise(j,2)=0;
+        for j =1:length(phisim)
+            if phisim(j,1) <0
+                phisim(j,1)=0;
             end
-            if Nbnoise(j,3) <0
-                Nbnoise(j,3) =0;
+            if phisim(j,1) >1
+                phisim(j,1) =1;
             end
         end
-        Nbnoise(:,1) = Nbnoise(:,2) + Nbnoise(:,3);
-        phitrt = Nbnoise(:,2)./Nbnoise(:,1); % vertical
-        phismooth = Nb(:,2)./Nb(:,1);
+        phisigfit = sigtech.*ones(length(phisim),1);
         % Set sigmaphi based on the sample variance of a Bernoulli R.V.
-        nsc = [3157; 5081;5081];
-        sigtech = 1e-4;
-        %phisigfit = [phitrt.*(1-phitrt)./nsc] + sigtech;
-        phisigfit =0.1*ones(length(tbot),1);
+        sigtech = 1e-2;
+        phisigfit =phisigfit(ikeep);
+        tphi = tbot(ikeep);
+        phitrt = phisim(ikeep);
         % Find an estimate of uncertainty in phitrt
         % Since we add noise to N data with a standard deviation eta, then the
         % uncertainty in the data is this noise/ the N data?
@@ -300,30 +326,54 @@ for i = 1:nsamps
     gtot = puntfit(i,1);
     carcapfit = puntfit(i,2);
     % change the set and fit values
-    pset = [phi0, carcapfit, dr];
+    pset = [carcapfit, carcapphi];
+    phi0guess = 0.9;
     rrguess = 1e-2*gtot;
     rstar = phi0/(1-phi0);
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
     alphaguess = 0.0035;
     dsguess = 0.001;
-    theta = [rsguess, alphaguess, rrguess, dsguess];
+    drguess = 0.1*dsguess;
+    theta = [phi0guess,rsguess, alphaguess, rrguess, dsguess, drguess];
     
     %Give this function both Ntrt and phitrt
     % can toggle the amount that we weigh each portion..
     % lambda =0-- fit on N(t) only. if lambda =1, fit on phi(t) only
-    lambda = 0.5;
- 
-   [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
+    
+                                      
+   [pbest,N_model, phi_model, negLL, pbestN, model_N_N, model_phi_N] = fit_fxn_phi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tphi, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi, pbounds);
                                     
-    pfittrt(i,:) = pbestf;
+    pfittrt(i,:) = pbest;
     Nfittrt(:,i) = N_model;
     phifittrt(:,i) = phi_model;
+    
+    peststore(i,:) = pbest;
+    peststoreN(i,:) = pbestN;
+
+    Neststore(i,:) = N_model;
+    phieststore(i,:) = phi_model;
+    NeststoreN(i,:) = model_N_N;
+    phieststoreN(i,:) = model_phi_N;
+    
+    
+    
     CCC_vec(i,1) = f_CCC([N_model, Ntrt], 0.05);
     CCC_vec(i,2) = f_CCC([phi_model, phitrt], 0.05);
-    CCC_vec(i,3)=f_CCC([pfset', pbestf'], 0.05);
+    CCC_vec(i,3)=f_CCC([pfset', pbest'], 0.05);
+    
+    CCC_vecN(i,1) = f_CCC([model_N_N, Ntrt], 0.05);
+    CCC_vecN(i,2) = f_CCC([model_phi_N, phitrt], 0.05);
+    CCC_vecN(i,3)=f_CCC([pfset', pbestN'], 0.05);
+  
+    if CCC_vec(i,3)>CCC_vecN(i,3)
+        ct_int = ct_int +1;
+    end
+    
+    
 end
-%%
-for i =18
+
+%% Plot an example figure
+for i =1
     
     ind = i;
 figure;
@@ -356,6 +406,15 @@ title (['\phi(t), CCC_{\phi}=', num2str(CCC_vec(ind,2)), ', CCC_{p}=', num2str(C
 set(gca,'FontSize',20,'LineWidth',1.5)
 %pause
 end
+
+
+
+
+
+
+
+
+
 %% Accuracy metrics take two:
 % We want to measure concordance between pgiven and pfti for all nsamps as
 % well as concordance between Ninsilo and Nfit for all nsamps

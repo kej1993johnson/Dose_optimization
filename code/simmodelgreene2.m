@@ -26,9 +26,8 @@ for i = 1:length(params)
     end
 end
 P = num2cell(params);
-[phi, rs, carcap1,carcap2,alpha, zr, ds, zd] = deal(P{:});
-rr = rs*zr;
-dr = ds*zd;
+[phi, rs, carcap1,carcap2,alpha, zr, ds, zr] = deal(P{:});
+
 
 Nsr = [];
 tsum = [];
@@ -43,7 +42,8 @@ for i = 1:size(lengthvec,1)
     S0 = phi*N0s(i);
     R0 = (1-phi)*N0s(i);
     % vary these based on what we're fitting
-  
+    rr = rs*zr;
+    dr = ds*zd;
     p = [ S0, R0, rs, carcap1, alpha, rr, ds, dr];
     
     tvec = round(ytimefit(istart(i):iend(i)),0);

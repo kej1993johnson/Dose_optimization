@@ -58,7 +58,7 @@ ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
 
 % Write a loop that will randomly select initial guesses from the bounds of
 % thetarange.
-Nstarts = 100;
+Nstarts = 10;
 Xmat = rand(length(pfit), Nstarts);
 for i = 1:Nstarts
 % Make a matrix where each column is a initial guess

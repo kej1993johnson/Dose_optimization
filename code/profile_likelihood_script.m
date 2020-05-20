@@ -1,33 +1,40 @@
-%function [profiles] = profile_likelihood(params, tsamp, N0, N,mudatavec, vardatavec, modelcode, factor, numpoints)
-%fit_fxn_Greenephi_N2(ydatafit,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
-%% For CLL
-Ub = Uphi;
-lengthvec = lengthvecN;
+
 %% RUN this to perform profile likelihood on joint calibration (N(t) and phi(t))
 nfitparams = length(pfitID);
         profile = [];
-factor0 = 1.3;
-numpoints = 30;
-params = pbest; % rs, alpha, zr, ds, zd];
-threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
+factor0 = 0.95;
+numpoints = 8;
+params = pbest; % phi0 rs, alpha, rr, ds, dr];
+threshold = chi2inv(0.95,length(pfitID))/2 + JNphi;
 profiles = [];
 
 
-pboundsprof = [0, Inf; 0, Inf; 0, 1; 0, Inf; 0, Inf; 0, 1];
+pboundsprof = [0, Inf; 0, Inf; 0, Inf; 0, 1; 0, Inf; 0, 1];
 profiles = [];
+lambda = 0.5;
 %%
 ikeep = [];
-for k = 1:nfitparams
+for k = 6%1:nfitparams
 profindex = pfitID(k); % PROFILE the kth fit parameter 
     factor = factor0;
-    if k ==1
+    if k ==1 
         factor = 0.2*factor0;
     end
+     if k ==2
+        factor = 0.2*factor0;
+     end
+      if k ==3
+        factor = 1.7*factor0;
+      end
+      if k ==4
+          factor = 1.3*factor0;
+      end
     if k == 5 % increase factor for ds and dr/ds ratio 
-        factor = 2*factor0;
+       factor = 2*factor0;
     end
     if k==6
-        factor = 8*factor0;
+        factor = 3.5*factor0;
+       
     end
     profrangeDown = linspace((params(k)), (params(k)*(1-factor)),numpoints)'; 
     profrangeUp = linspace((params(k)), (params(k)*(1+factor)),numpoints)';
@@ -54,7 +61,12 @@ profindex = pfitID(k); % PROFILE the kth fit parameter
         pboundscurr = pboundsprof(ikeep, :);
         pcomb = [pset, currp];
         psetcurr = pcomb(ordp);
-        [paramstemp,~, ~, fvaltemp, ~, ~]=fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitIDcurr, psetIDcurr, thetacurr, psetcurr, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pboundscurr);
+        fhNphi = @(p)objfun(p, ydatafit, phitrt, tN, tphi,N0s, N0phi, Uvec, Uphi, lengthvec, lengthvecphi, pfitIDcurr, psetIDcurr, psetcurr, sigmafit, phisigfit);
+        options = optimset('TolFun',1e-5);
+        [paramstemp]=lsqnonlin(fhNphi, thetacurr, pboundscurr(:,1), pboundscurr(:,2), options);
+        fvaltemp = sum(fhNphi(paramstemp));
+        
+        %[paramstemp,~, ~, fvaltemp, ~, ~]=fit_fxn_Greenephi_Nprof(ydatafit,sigmafit,phitrt, phisigfit, pfitIDcurr, psetIDcurr, thetacurr, psetcurr, tN,tphi, Uvec, Uphi, lengthvec,lengthvecphi, N0s,N0phi,lambda, pboundscurr);
         
         %[fvaltemp, paramstemp] = ML_fitnegLL(params, tsamp, N0, N, mudatavec, vardatavec, modelcode, profindex, currp);
         % fminsearch will out put the values of dguess that give the lowest
@@ -92,15 +104,18 @@ end
 
 
 %% Plot the profiles joint fitting 
-plist = {'r_{s}', '\alpha', 'rr/rs', 'd_{s}', 'dr/ds'};
-plist = {'\phi_{0}','r_{S}', 'r_{S}/r_{S} ratio', '\alpha', 'd_{S}', 'd_{R}/d_{S} ratio'};
-threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
+plist = {'\phi_{0}','r_{S}', '\alpha', 'r_{R}/r_{S}', 'd_{S}', 'd_{R}/d_{S}'};
+%plist = {'\phi_{0}','r_{S}', '\alpha','r_{R}', 'd_{S}', 'd_{R}'};
+%threshold = chi2inv(0.95,length(pfitID))/2 + negLL;
+% load in the other CIs
+%%
+negLL= JNphi;
 figure;
 for i = 1:length(pbest)
 subplot(2,3,i)
-plot([CI(i,1) CI(i,1)], [0 50], 'g-', 'LineWidth', 3)
+%plot([CI(i,1) CI(i,1)], [0 50], 'g-', 'LineWidth', 3)
 hold on
-plot([CI(i,2) CI(i,2)], [0 50], 'g-', 'LineWidth',3)
+%plot([CI(i,2) CI(i,2)], [0 50], 'g-', 'LineWidth',3)
 plot(profiles(:,1, i), profiles(:,2, i),'b-', 'LineWidth', 3)
 hold on
 plot(pbest(i), negLL, 'r*', 'LineWidth', 4)
@@ -108,20 +123,40 @@ plot([profiles(1,1,i) profiles(end,1,i)],[threshold threshold],'r--')
 xlabel(plist(i))
 ylabel('J(\theta)')
 set(gca,'FontSize',24,'LineWidth',1.5)
-legend('95% CI')
-legend boxoff
+ylim([35 55])
+%legend('95% CI')
+%legend boxoff
 
 %title(plist(i))
-ylim([0 1.3*threshold])
-%xlim([0.5*pbest(i) 2*pbest(i)])
+% ylim([0 1.3*threshold])
+% xlim([0.5*pbest(i) 2*pbest(i)])
 % if i == 1
-%      xlim([0.8 0.9])
-% end
+%     xlim([0.8 0.9])
 % else
-xlim([0.7*CI(i,1),1.1*CI(i,2)])
+%     xlim([0.7*CI(i,1),1.1*CI(i,2)])
 % end
 % xlim([CI(i,1)-0.1*pbest(i),CI(i,2)+0.1*pbest(i)])
 % ylim([ 0 50])
+
+% RUN THIS FOR N only
+
+% if i ==1
+%     xlim([0.8 0.9])
+% end
+% if i ==2
+%     xlim([0.015 0.055])
+% end
+% if i ==3
+%     xlim([0.08 0.32])
+% end
+% if i ==5
+%     xlim([1e-3 8e-3])
+% end
+% if i ==6
+%     xlim([0.5 1.5])
+% end
+
+
 end
 %% Save the CI from the profile likelihood of N(t) and phi(t)
 % uncertainty to model uncertainty
@@ -265,6 +300,6 @@ for i = 1:length(pbest)
     legend boxoff
     title(plist(i))
     ylim([0 1])
-    xlim([CI(i,1) CI(i,2)])
+    %xlim([CI(i,1) CI(i,2)])
 end
 %% Is there another good way to plot the parameters and their CI?

@@ -25,10 +25,10 @@ rs = 0;
 carcap1 = 0;
 carcap2 = 0;
 alpha = 0;
-zr = 0;
+rr = 0;
 ds = 0;
-zd = 0;
-params = [prop, rs, carcap1, carcap2, alpha, zr, ds, zd];
+dr = 0;
+params = [prop, rs, carcap1, carcap2, alpha, rr, ds, dr];
 for i = 1:length(params)
     indset= find(ismember(psetID, i));
     if ~isempty(indset)
@@ -40,7 +40,7 @@ for i = 1:length(params)
     end
 end
 P = num2cell(params);
-[prop, rs, carcap1, carcap2, alpha, zr, ds, zd] = deal(P{:});
+[prop, rs, carcap1, carcap2, alpha, rr, ds, dr] = deal(P{:});
  
 % Define transforms: Now these must be logs and logits since zr and zd are
 % bound between 0 and 1 (3&5)
@@ -75,14 +75,14 @@ weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2)./(phisigfit.
 % weighting?
 %weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2));
 %weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2));
-objfun= @(phat)(1-lambda).*(1./nsampsN).*weightederrN(phat) + lambda.*(1./nsampsphi).*weightederrphi(phat);
+objfun= @(phat)(1./nsampsN).*weightederrN(phat) + (1./nsampsphi).*weightederrphi(phat);
 
 %objfunLL=@(phat)((1-lambda)*loglikelihoodN(phat) + lambda*loglikelihoodphi(phat));
 LB = pfxform(pbounds(:,1)');
 UB = pfxform(pbounds(:,2)');
 % This should make the search more exhaustive...
-options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e6, 'TolFun', 1e-6, 'TolX', 1e-6);
-phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB, options);
+%options = optimset('MaxIter', 1e4, 'MaxFunEvals', 1e6, 'TolFun', 1e-6, 'TolX', 1e-6);
+phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
 pbest = pbxform(phatbest);
 
 

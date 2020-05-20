@@ -3,8 +3,9 @@
 % mean vector and U(t) vector for each different concentration tested. This
 % will be used as a first pass to calibrate to the model.
 
-% Adjusted this to include phi0 from scRNAseq estimates, but still only use
-% N(t)
+% Here we calibrate the model using N(t) data only. 
+
+
  close all; clear all; clc
  
  %% Load in data structure 
@@ -20,13 +21,14 @@ uniqdose= unique(doses);
 % Make a new structure which combines each dox concentration
     % percapita growth rate 
     % variance of per capita growth rate
- %%
+
  % find groups by dose
  for i = 1:length(uniqdose)
     trajsum(i).Cdox = [];
     trajsum(i).Nmat = [];
     trajsum(i).nreps = 0;
     trajsum(i).tmat = [];
+    trajsum(i).tcrits = [];
  end
 
  for i = 1:length(uniqdose) % number of unique seed numbers
@@ -40,6 +42,7 @@ uniqdose= unique(doses);
                     trajsum(i).tmat = horzcat(trajsum(i).tmat,traj(j).time);
                     trajsum(i).Nmat = horzcat(trajsum(i).Nmat, traj(j).rawN);
                     trajsum(i).tdose = traj(j).tdose;
+                    trajsum(i).tcrits = horzcat(trajsum(i).tcrits, traj(j).tcrit);
                 end
         end
     end
@@ -78,38 +81,20 @@ uniqdose= unique(doses);
     trajsum(i).Nfit =Nfit;
     trajsum(i).tvec = trajsum(i).tfit(:,1);
 end
-  %% Plot the cleaned data
-  figure;
- for i = 1:length(trajsum)
-     for j = 1: trajsum(i).nreps
-         plot(trajsum(i).tfit(:,j), trajsum(i).Nfit(:,j), 'color', trajsum(i).color)
-         hold on
-     end
- end
- xlabel('time (hours)')
- ylabel('N(t)')
- title('N(t) for different single pulse treatments')
+
  %% Test and set U(t) curves
 % Set some arbitrary things as inputs
 
-kdrug = 0.0175;
+kdrug = 0.0175*0.75;
 k = 0.5;
 dt = 1;
 Cdoxmax = 1000;
 % input time vectors for each different dose response
-figure;
 for i = 1:length(trajsum)
     ttest = [];
     ttest = 0:dt:trajsum(i).tvec(end);
     Cdox = trajsum(i).Cdox;
     trajsum(i).U = k*Cdox*exp(-kdrug*(ttest))/(0.1*Cdoxmax); 
-    subplot(1, length(trajsum),i)
-    plot(ttest, trajsum(i).U, 'b-', 'LineWidth',2)
-    ylim([0 1])
-    xlim([ 0 ttest(end)])
-    xlabel('time (hours)')
-    ylabel('Effective dose (U(t))')
-    title([num2str(trajsum(i).Cdox),' nM Dox'])
 end
 %% Now find mean and standard deviation vectors
 
@@ -117,6 +102,8 @@ for i = 1:length(trajsum)
     trajsum(i).Nmean = mean(trajsum(i).Nfit,2);
     trajsum(i).tvec = round(trajsum(i).tfit(:,1),0);
     trajsum(i).Nstd = std(trajsum(i).Nfit,0,2);
+    trajsum(i).tcrit = nanmean(trajsum(i).tcrits);
+    trajsum(i).tcritstd = nanstd(trajsum(i).tcrits);
 end
 % Plot the average data 
   figure;
@@ -145,7 +132,7 @@ end
 
 
 %% Test forward model
-% set parameters of forward model
+% set arbitrary parameters of forward model
 carcap = 5.2409e4;
 S0=0.9*trajsum(1).Nmean(1); % set initial conditions (assume all cells sensitive to start)
 R0=0.1*trajsum(1).Nmean(1); 
@@ -183,7 +170,7 @@ plot(trajsum(1).tvec, trajsum(1).Nmean, 'r*')
 xlabel('time (hours)')
 ylabel('Model predicted response to pulse treat')
 title('Test ability to generate model trajectories')
-%% Fit untreated control data by calling separate function 
+%% Fit untreated control data by calling a separate function, use this for K
 % grab untreated data
 sigma = trajsum(1).Nstd(1:end);
 ydataf = trajsum(1).Nmean;
@@ -208,17 +195,12 @@ carcap = punt(2);
     title ('Fit for g_{tot} & K using untreated control')
     set(gca,'FontSize',20,'LineWidth',1.5)
 
- %% Now use this and fit for gr, ds, and alpha from single pulse treatments
+ %% Now use this and fit for remaining parameters from N(t) from 4 treatments
 
-%dr=0;
-%phi0 = 0.92; % Set this from the scRNAseq from pre-treatment
-rstar= phi0/(1-phi0);
 pset = [carcap];
-%params = [phi, rs, carcap, alpha, rr, ds, dr];
-% Now we want to allow dr to be non-zero
 psetID = [3];
 
-%% Bayesian fit for alpha, rr, and ds using all treatments
+% Bayesian fit for alpha, rr, and ds using all treatments
 
 % The simplified  model looks like this
 %
@@ -226,7 +208,7 @@ psetID = [3];
 % dS/dt = rs(1-(S+R)/K)*S - alpha*u(t)*S - ds*u(t)*S
 % dR/dt = rr(1-(S+R)/K)*R + alpha*u(t)*S- dr*u(t)*R ;
 % 
-% We will fit N= S +R trajectories for doses 10, 20, 35, 50, & 75
+% We will fit N= S +R trajectories for doses 0, 75, 200, and 300 nM
 % Make vectors of inputs from 2:6 of traj sum corresponding to doses desired to
 % fit
 sigmafit = [];
@@ -237,8 +219,7 @@ lengtht = [];
 lengthU = [];
 Uvec = [];
 
-% fit on doses 10, 20, 35, 50 & 75 nM dox
-% Grab the stdev, ydata, initial cell number, and U from the traj data
+% fit on doses 0, 75, 200, and 300, ydata, initial cell number, and U from the traj data
 % structure 
 dosefit = [1,4,7,9];
 for j = 1:4%length(trajsum)
@@ -259,7 +240,7 @@ pfID = [ 1, 2, 4, 5, 6, 7];
 phi0guess = 0.9;
 alphaguess =  0.1;
 rrguess = 1e-3;
-rsguess = ((rstar+1)*gtot - rrguess)./rstar; % expression that relates gs, gr, and gtot
+rsguess = 0.7.*gtot; % expression that relates gs, gr, and gtot
 dsguess = 0.2;
 drguess = 0.1*dsguess;
 pfitguess = [phi0guess, rsguess, alphaguess, rrguess, dsguess, drguess]; 
@@ -287,19 +268,9 @@ title ('Test guess for fit for rs, \alpha, rr and ds')
 %phitrt = [0.1, 0.7];
 %phisigfit = [0.1, 0.1];
 Ntrt = ydatafit;
-% set bounds for rs, alpha, rr, ds
+% set bounds for phi0, rs, alpha, rr, ds, dr
 pbounds = [ 0,1; 0,0.08; 0, 1; 0, 1; 0,1; 0,1];
-%lambda = 0.9;
-%N0phi = [phi0*N0, (1-phi0)*N0];
-%tbot = [30 1008];
-% Need Ub and lengthvecphi-- which are the effective dose and the size of
-% the data for the phi data aspects
 
-
-%[pbestf,N_model, negLL, pbestGD, N_modelGD, negLLGD]
-% Here is where we will replace fit_fix_Greene with fit_fxn_Greenephi_N
-%[pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi,lambda, pbounds);
-%(ydatafit, sigmafit, pfID, psetID, pfit, pset, time, Uvec, lengthvec, N0s, pbounds)
 [pbestf,N_model, negLL] = fit_fxn_Greene(ydatafit,sigmafit, pfID, psetID, pfitguess, pset, ytimefit, Uvec, lengthvec, N0s, pbounds);
 CCC = corrcoef(N_model,ydatafit);
 phi0 = pbestf(1);
@@ -308,22 +279,9 @@ alpha = pbestf(3);
 rr = pbestf(4);
 ds = pbestf(5);
 dr = pbestf(6);
-%%
-chi_sq = sum(((N_model-ydatafit)./sigmafit).^2)
-%chi_sqGD = sum(((N_modelGD-ydatafit)./sigmafit).^2)
-%%    
-    figure;
-    plot(ytimefit, ydatafit, 'b*', 'LineWidth', 3)
-    hold on
-    plot(ytimefit, N_model,'r*', 'LineWidth', 3')
-    plot(ytimefit, ydatafit + 1.96*sigmafit, 'g.')
-    plot(ytimefit, ydatafit - 1.96*sigmafit, 'g.')
-    xlabel ('time (hours)')
-    ylabel(' N(t)')
-    legend ('data from mult treatments', 'model fit')
-    legend box off
-    title ('Fit for \alpha, rr, ds and dr')
-    set(gca,'FontSize',20,'LineWidth',1.5)
+chi_sq = sum(((N_model-ydatafit)./sigmafit).^2);
+
+
 %% Plot calibrated data
 N0 = 2e3;
 tdrug = 1;
@@ -339,15 +297,17 @@ p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
        
          xlabel('time (hours)')
         ylabel('N(t)')
-        title('Model calibration Trial Run N(t) only')
+        title('Model calibration trial tun N(t) only')
         dt = 1;
         tvec = [];
         Nsri = [];
         tvec = trajsum(i).tvec;
         U = trajsum(i).U;
          pi = p;
-         pi(1) = phi0*trajsum(i).Nmean(1);
-         pi(2) = (1-phi0)*trajsum(i).Nmean(1);
+         pi(1) = phi0*trajsum(i).Nmean(1); % S0
+         pi(2) = (1-phi0)*trajsum(i).Nmean(1); % R0
+         % for this function, S0, and R0 are first two inputs then
+         % everything else
         [Nsri, tcrit, Ncrit] = fwd_Greene_model(pi, tvec, U, dt, tdrug);
         plot(tvec, Nsri(:,1), 'color','r', 'LineWidth',2)
         %plot(tcrit, Ncrit, '*', 'LineWidth',2)
@@ -366,33 +326,9 @@ p= [phi0*N0, (1-phi0)*N0, rs, carcap, alpha, rr, ds, dr];
         title('Effective dose of each pulse treatment')
         set(gca,'FontSize',20,'LineWidth',1.5)
  end
- %% Save calibrated parameters from 231s with 4 doses 25-150 nM
- 
-p4fit= [rs, carcap, alpha, rr, ds, dr, k ,kdrug, gtot];
-save('../out/p4fit231', 'p4fit')
-% Save trajsum
-%p= [N0, 0, rs, carcap, alpha, rr, ds, dr];
-for i = 1:length(trajsum)
-    pi = p;
-    pi(1) = trajsum(i).Nmean(1);
-    tvec = [];
-    Nsri = [];
-    tvec = trajsum(i).tvec;
-    U = trajsum(i).U;
-    [Nsri, tcrit, Ncrit] = fwd_Greene_model(p, tvec, U, dt, tdrug);
-   trajsum(i).Nmod1pulse = Nsri;
-    trajsum(i).params = pi;
-    trajsum(i).N0 = trajsum(i).Nmean(1);
-    trajsum(i).rs= rs;
-    trajsum(i).carcap = carcap;
-    trajsum(i).alpha = alpha;
-    trajsum(i).rr = rr;
-    trajsum(i).ds = ds;
-    trajsum(i).dr = 0;
-    trajsum(i).kdrug =kdrug;
-end
+
 
 %% Save the parameter estimates
-p4fit= [rs, carcap, alpha, rr, ds, dr, k, kdrug];
-save('../out/p4fit231', 'p4fit')
+pfit= [phi0, rs, carcap, alpha, rr, ds, dr, k, kdrug];
+save('../out/pfitN', 'pfit')
 save('../out/trajsumfit231.mat', 'trajsum')

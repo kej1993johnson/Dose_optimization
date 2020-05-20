@@ -14,30 +14,30 @@ traj= S.traj;
 S = load('../out/trajsumfit231.mat');
 trajsum = S.trajsum;
 
-ptest = load('../out/ptest.mat');
+ptest = load('../out/pNphi.mat');
 ptest = struct2cell(ptest);
 ptest = cell2mat(ptest);
 P = num2cell(ptest);
 
-ptestN = load('../out/ptestN.mat');
+ptestN = load('../out/pN.mat');
 ptestN = struct2cell(ptestN);
 ptestN = cell2mat(ptestN);
 PN = num2cell(ptestN);
 
 
-% Also don't really need the confidence intervals
-CI = load('../out/CIpbest.mat');
-CI = struct2cell(CI);
-CI = cell2mat(CI);
-CIphi0 = CI(1,:);
-CIrs = CI(2,:);
-CIalpha = CI(3,:);
-CIzr = CI(4,:);
-CIds = CI(5,:);
-CIzd=CI(6,:);
+% % Also don't really need the confidence intervals
+% CI = load('../out/CIpbest.mat');
+% CI = struct2cell(CI);
+% CI = cell2mat(CI);
+% CIphi0 = CI(1,:);
+% CIrs = CI(2,:);
+% CIalpha = CI(3,:);
+% CIzr = CI(4,:);
+% CIds = CI(5,:);
+% CIzd=CI(6,:);
 
-[phi0, carcapNf, carcapphi, rs, alpha, zr, ds, zd, k, kdrug, gtot] = deal(P{:});
-[phi0N, carcapNf, carcapphi, rsN, alphaN, zrN, dsN, zdN, k, kdrug, gtot] = deal(PN{:});
+[phi0, carcapN, carcapphi, rs, alpha, rr, ds, ds, k, kdrug] = deal(P{:});
+[phi0N, carcapN, carcapphi, rsN, alphaN, rrN, dsN, drN, k, kdrug,] = deal(PN{:});
 
 %% Run this forward for a single pulse treatment at 200 nM 
 % Again, assume R0=0; dr = 0 and

@@ -16,10 +16,15 @@ traj= S.traj;
 S = load('../out/trajsumfit231.mat');
 trajsum = S.trajsum;
 
-ptest = load('../out/ptest.mat');
+ptest = load('../out/pNphi.mat');
 ptest = struct2cell(ptest);
 ptest = cell2mat(ptest);
 P = num2cell(ptest);
+
+ptestN = load('../out/pN.mat');
+ptestN = struct2cell(ptestN);
+ptestN = cell2mat(ptestN);
+PN = num2cell(ptestN);
 
 % Also don't really need the confidence intervals
 CI = load('../out/CIpbest.mat');

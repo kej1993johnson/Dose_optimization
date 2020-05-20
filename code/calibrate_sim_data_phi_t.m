@@ -118,13 +118,14 @@ end
 %% Set & store known parameters
 nsamps = 100;
 
-pbounds = [0,1; 0, 1; 0, 1; 0,1]; 
+pbounds = [0,1; 0, 1; 0, 1; 0,1; 0,1]; 
 phidom =linspace(0.7,1,100);
 rsdom = linspace(0.001, 0.1, 100);
 carcapdom = linspace(4.8e4, 5.5e4, 100);
 alphadom = linspace(0, 0.01, 100);
 rrdom = linspace(0, 0.001, 100);
 dsdom = linspace(0,0.01, 100);
+drdom = linspace(0,0.01, 100);
 
 for i = 1:nsamps
     phi0=randsample(phidom,1);
@@ -137,11 +138,11 @@ for i = 1:nsamps
         rr=rs;
     end
     ds = randsample(dsdom,1);
-    dr = 0;
+    dr = randsample(drdom,1);
     pallstore(i,:) = [phi0, rs,carcap, alpha, rr, ds ,dr];
     rstar = phi0/(1-phi0);
     puntfstore(i,:) = [carcap];
-    pfitstore(i,:) = [ rs, alpha, rr, ds];
+    pfitstore(i,:) = [ rs, alpha, rr, ds, dr];
 end
 %% Generate untreated control data
 % Fit this only to N(t) 
@@ -192,8 +193,8 @@ title ('Example fit to untreated control simulated data')
 set(gca,'FontSize',20,'LineWidth',1.5)
 %% Generate dosed data and fit it using puntfit
 % Here we're going to generate dosed data and output N(t) and phi(t)
-psetID = [1, 3, 7];
-pfitID = [2, 4, 5, 6];
+psetID = [1, 3];
+pfitID = [2, 4, 5, 6, 7];
 % Get what we need from real data
 sigmafit = [];
 ytimefit = [];
@@ -222,12 +223,12 @@ tbot = [0:4:1344];
 Ub=k*Cdox*exp(-kdrug*(tgen));
 lengthvecphi = [length(tbot), length(tgen)];
 lam = 100;
-for i = 10%1:nsamps
+for i = 1:1:nsamps
     
     P=num2cell(pallstore(i,:));
     [phi0, rs, carcap, alpha, rr, ds, dr]= deal(P{:});
-    pset = [phi0, carcap, dr];
-    pfset = [rs, alpha, rr, ds];
+    pset = [phi0, carcap];
+    pfset = [rs, alpha, rr, ds, dr];
     Ntrt = [];
     phitrt = [];
     for j = 2:6
@@ -286,11 +287,15 @@ for i = 10%1:nsamps
     rrguess = 1e-3*gtot;
     rstar = phi0/(1-phi0);
     rsguess =  ((rstar+1)*gtot - rrguess)./rstar;
-    theta = [rsguess, 0.0035, rrguess, 0.001];
-    
+    theta = [rsguess, 0.0035, rrguess, 0.001, 0.0005];
+    thetarange = [rsdom(1), rsdom(end); alphadom(1), alphadom(end); rrdom(1), rrdom(end); dsdom(1), dsdom(end); drdom(1), drdom(end)];
+    theta = mean(thetarange,2)'; 
     % Give this function both Ntrt and phitrt
     %[pbestf,N_model, negLL] = fit_fxn_GreeneNphi(Ntrt,sigmafit, phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec, lengthvecphi, N0s, pbounds);
-    [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi, pbounds);
+    lambda = 0.5;
+    %[pbestvec,N_model, phi_model, negLLvec, err_N, err_phi]
+    
+    [pbestf,N_model, phi_model, negLL] = fit_fxn_Greenephi_N2(Ntrt,sigmafit,phitrt, phisigfit, pfitID, psetID, theta, pset, ytimefit,tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s,N0phi, lambda, pbounds);
                                     
     pfittrt(i,:) = pbestf;
     Nfittrt(:,i) = N_model;

@@ -49,10 +49,15 @@ ybxform = @(yhat)exp(yhat); % 'inverse' transform for data and model output
 modelfun = @(p)simmodelgreene(p, time, N0s, pset, Uvec, lengthvec, pfID, psetID); 
 
 loglikelihood = @(phat)sum(log(normpdf(yfxform(ydatafit),yfxform(modelfun(pbxform(phat))), sigmafit)));
+weightederrN =@(phat)sum(((modelfun(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
+errN =@(phat)sum(((modelfun(pbxform(phat))-ydatafit).^2));
 LB = pfxform(pbounds(:,1)');
 UB = pfxform(pbounds(:,2)');
     % Write objective functions for each model
-    objfun = @(phat)-loglikelihood(phat); 
+    nsampsN = length(ydatafit);
+    %objfun = @(phat)-loglikelihood(phat);
+    %objfun= @(phat)(1./nsampsN).*weightederrN(phat);
+    objfun= @(phat)(1./nsampsN).*errN(phat);
     phatbest = fminsearchbnd(objfun, pfxform(theta), LB, UB);
     
     pbest = pbxform(phatbest);

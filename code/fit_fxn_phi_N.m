@@ -1,4 +1,4 @@
-function [pbest,model_N, model_phi, negLL] = fit_fxn_Greenephi(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, pbounds) 
+function [pbest,model_N, model_phi, negLL, pbestN, model_N_N, model_phi_N] = fit_fxn_Greenephi(ydatafit, sigmafit,phitrt, phisigfit, pfID, psetID, pfit, pset, time, tbot, Uvec, Ub, lengthvec,lengthvecphi, N0s, N0phi, pbounds) 
 
 
 
@@ -9,18 +9,15 @@ function [pbest,model_N, model_phi, negLL] = fit_fxn_Greenephi(ydatafit, sigmafi
 % us this with a 1 for a parameter that must be fit and a 0 for a parameter
 % that is set.
 
-% TEST
-
-% Find pfit
-% P = num2cell(pID); 
-% Initialize parameters
 prop = 0;
 rs = 0;
-carcap = 0;
+carcapN = 0;
+carcapphi = 0;
 alpha = 0;
 rr = 0;
 ds = 0;
 dr = 0;
+%params = [prop, rs, carcap1, carcap2, alpha, zr, ds, zd];
 params = [prop, rs, carcapN, carcapphi, alpha, rr, ds, dr];
 for i = 1:length(params)
     indset= find(ismember(psetID, i));
@@ -53,24 +50,47 @@ modelfunN = @(p)simmodelgreene2(p, time, N0s, pset, Uvec, lengthvec, pfID, psetI
 modelfunphi = @ (p)simmodelgreenephi2(p, tbot, N0phi, pset, Ub, lengthvecphi, pfID, psetID);
 %
 loglikelihoodphi =@(phat)(sum(log(normpdf(phitrt,modelfunphi(pbxform(phat)), phisigfit))));
-weightederrphi =@(phat)sum(((modelfunphi(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
-errphi =@(phat)sum(((modelfunphi(pbxform(phat))-ydatafit).^2));
+weightederrphi =@(pval)sum(((modelfunphi(pval)-phitrt).^2)./(phisigfit).^2);
+errphi =@(phat)sum(((modelfunphi(pbxform(phat))-phitrt).^2));
+relerrphi =@(phat)sum((((modelfunphi(pbxform(phat))-phitrt)./phitrt).^2));
 
 
 loglikelihoodN = @(phat)(sum(log(normpdf(yfxform(ydatafit),yfxform(modelfunN(pbxform(phat))), sigmafit))));
-weightederrN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2)./(sigmafit.^2));
+weightederrN =@(pval)sum(((modelfunN(pval)-ydatafit).^2)./(sigmafit).^2);
 errN =@(phat)sum(((modelfunN(pbxform(phat))-ydatafit).^2));
+relerrN =@(phat)sum((((modelfunN(pbxform(phat))-ydatafit)./ydatafit).^2));
 
 
+nsampsN = length(ydatafit);
+nsampsphi = length(phitrt);
 
-objfun = @(phat)-(loglikelihoodphi(phat));
-phatbest = fminsearch(objfun, pfxform(theta));
+%objfun = @(phat)-(1./nsampsN).*loglikelihoodN(phat)-(1./nsampsphi).*loglikelihoodphi(phat);
+objfun= @(pval)(1./nsampsN).*weightederrN(pval) + (1./nsampsphi).*weightederrphi(pval);
+%objfun= @(phat)(1./nsampsN).*errN(phat) + (1./nsampsphi).*errphi(phat);
+
+%objfun= @(phat)(1./nsampsN).*relerrN(phat) + (1./nsampsphi).*relerrphi(phat);
+%objfun= @(phat)(1./nsampsN).*relerrN(phat);
+LB = pbounds(:,1);
+UB = pbounds(:,2);
+objfunN= @(phat)(1./nsampsN).*weightederrN(phat);
+phatbest = fminsearchbnd(objfun, theta, LB, UB);
+phatbestN = fminsearchbnd(objfunN,theta, LB, UB);
 pbest = pbxform(phatbest);
+pbestN= pbxform(phatbestN);
+
+phi_err = errphi(phatbest);
+N_err = errN(phatbest);
+err = [N_err, phi_err];
+
+errweighted = [weightederrN(phatbest), weightederrphi(phatbest)];
 
 
+relerr= [relerrN(phatbest), relerrphi(phatbest)];
 
     model_N = modelfunN(pbest);
+    model_N_N=modelfunN(pbestN);
     model_phi = modelfunphi(pbest);
+    model_phi_N = modelfunphi(pbestN);
    negLL = objfun(phatbest);
    
    % Try gradient descent method for finding phi
