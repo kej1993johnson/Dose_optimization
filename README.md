@@ -2,7 +2,7 @@
 
 For the classifier model from scRNAseq data (Python files)
 1. KJ_choose_classifer.py- Loads in the scRNAseq data, assigns pretreatment cells as sensitive or resistant resistant based on change in lineage abundance, uses labeled data set to test out the accuracy of PCA+KNN classifiers and linear SVM classifier using 5-fold CV. Determines a reasonable threshold probability for each classifier using the entire pre-treatment data set. 
-2. KJ_PCAKNN.py- classifies the unlabeled cells in the scRNAseq data from all time points using PCA. Makes corresponding figures of projections in PC space, and outputs the phenotypic composition (phi_t), and the variance in PCs- all intended for the supplement. Uses the hyperparameters in KJ_hyperparm_optimization.py
+2. KJ_PCAKNN.py- classifies the unlabeled cells in the scRNAseq data from all time points using PCA. Makes corresponding figures of projections in PC space, and outputs the phenotypic composition (phi_t), and the variance in PCs- all intended for the supplement. Uses the hyperparameters in KJ_findhyperps.py
 3. KJ_SVM.py - classifies the unlabeled cells in the scRNAseq data from all time points using linear SVM. Makes the UMAPS colored by class estimate for each time point and for the whole data set, and outputs the phenotypic composition (phi_t).    
 
 
