@@ -145,7 +145,17 @@ plt.grid(b=None)
 
 #%% Make the sensitive and resistant labels within your anndata object
 
-classLabel = np.array(['res', 'sens', 'unknown', 'res_est', 'sens_est'])
+# Label the cells and differentiate by estimate 
+#classEst = np.array(['training set R', 'training set S', 'unknown', 'estimated R', 'estimated S'])
+#adata.obs.loc[adata.obs.timepoint=='t=0 wks','classEst'] = 'unknown'
+#adata.obs.loc[adata.obs.timepoint=='t=7 wks','classEst'] = 'unknown'
+#adata.obs.loc[adata.obs.timepoint=='t=10 wks','classEst'] = 'unknown'
+#adata.obs.loc[(adata.obs.linabundchange>R_threshold)&(adata.obs.timepoint=='t=0 wks'), 'classEst'] = 'training set R'
+#adata.obs.loc[(adata.obs.linabundchange<-S_threshold)&(adata.obs.timepoint=='t=0 wks'), 'classEst'] = 'training set S'
+#adata.obs.loc[adata.obs.lineage=='nan', 'classEst'] = 'unknown'
+
+# Label the cells just by S and R
+classLabel = np.array(['res', 'sens', 'unknown',])
 adata.obs.loc[adata.obs.timepoint=='t=0 wks','classLabel'] = 'unknown'
 adata.obs.loc[adata.obs.timepoint=='t=7 wks','classLabel'] = 'unknown'
 adata.obs.loc[adata.obs.timepoint=='t=10 wks','classLabel'] = 'unknown'
@@ -156,6 +166,7 @@ adata.obs.loc[adata.obs.lineage=='nan', 'classLabel'] = 'unknown'
 
 # plot the labeled cells alongside unknown cells and alone on same axes.
 sc.pl.umap(adata,color='classLabel', palette = ['red', 'green', 'gray'])
+#sc.pl.umap(adata,color='classEst', palette = ['red', 'green', 'gray'])
 sc.pl.umap(adata,color='classLabel', palette = ['red', 'green', 'white'])
 
 
@@ -178,8 +189,8 @@ Xsr = dfsr.drop(columns= [ 'classLabel', 'lineage'])
 
 
 
-# %%Assign the parameters for PCA+KNN and Linear SVM and fit the models
-# PCA hyperparameters optimized in KJ_find_hyperparameters.py 
+# %%Assign the parameters for Linear SVM and fit the models
+
 
 
 # SET UP SVM
@@ -273,21 +284,75 @@ class_est= pd.DataFrame(y_est, index = adata_unk.obs.index)
 class_est.columns=['est']
 adata.obs['class_est'] = adata.obs.index.map(class_est.est)
 sc.pl.umap(adata,color=['class_est'])
+
+classEst2 = np.array(['training set S', 'training set R', 'estimated S', 'estimated R'])
+adata.obs.loc[(adata.obs.class_est==1), 'ClassEst'] = 'estimated R'
+adata.obs.loc[(adata.obs.class_est==0), 'ClassEst'] = 'estimated S'
+adata.obs.loc[(adata.obs.classLabel=='res'), 'ClassEst'] = 'training set R'
+adata.obs.loc[(adata.obs.classLabel=='sens'), 'ClassEst'] = 'training set S'
+
+reslin = ['GTACATTTTCATACCTCTCG']
+senslin = ['GTGTGTTGTTTTTGTACGGC']
+
+
+adata.obs.loc[adata.obs.lineage.isin(reslin)==True,'recalled_lin'] = 'res_lin'
+adata.obs.loc[adata.obs.lineage.isin(reslin)==False,'recalled_lin'] = 'na'
+adata.obs.loc[adata.obs.lineage.isin(senslin)==True,'recalled_lin'] = 'sens_lin'
+
+
+
+print(adata.obs['recalled_lin'])
+
+classEst2 = np.array(['training set S', 'training set R', 'estimated S', 'estimated R'])
+adata.obs.loc[(adata.obs.class_est==1), 'ClassEst'] = 'estimated R'
+adata.obs.loc[(adata.obs.class_est==0), 'ClassEst'] = 'estimated S'
+adata.obs.loc[(adata.obs.classLabel=='res'), 'ClassEst'] = 'training set R'
+adata.obs.loc[(adata.obs.classLabel=='sens'), 'ClassEst'] = 'training set S'
+
+# add the labeled to ann data object
 adata.obs.loc[adata.obs.class_est==1, 'classLabel'] = 'res'
 adata.obs.loc[adata.obs.class_est==0, 'classLabel'] = 'sens'
+#adata.obs.loc[adata.obs.class_est==1, 'classEst'] = 'estimated R'
+#adata.obs.loc[adata.obs.class_est==0, 'classEst'] = 'estimated S'
 # Make a new .obs variable that divides into time point and class label
-TPclass = np.array(['t=0 wks sens', 't=0 wks res', 't=7 wks sens', 't=7 wks res', 't=10 wks sens', 't=10 wks res'])
+TPclass = np.array(['training set S', 'training set R', 't=0 wks sens', 
+                    't=0 wks res', 't=7 wks sens','t=7 wks res', 
+                    't=10 wks sens', 't=10 wks res'])
 
-adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.classLabel == 'sens'), 'TPclass'] = 't=0 wks sens'
-adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.classLabel == 'res'), 'TPclass'] = 't=0 wks res'
-adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.classLabel == 'sens'), 'TPclass'] = 't=7 wks sens'
-adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.classLabel == 'res'), 'TPclass'] = 't=7 wks res'
-adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.classLabel == 'sens'), 'TPclass'] = 't=10 wks sens'
-adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.classLabel == 'res'), 'TPclass'] = 't=10 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'training set S'), 'TPclass'] = 'training set S'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'training set R'), 'TPclass'] = 'training set R'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclass'] = 't=0 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclass'] = 't=0 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclass'] = 't=7 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclass'] = 't=7 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclass'] = 't=10 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclass'] = 't=10 wks res'
 
+TPclasslin = np.array(['training set S', 'training set R', 't=0 wks sens', 
+                    't=0 wks res', 't=7 wks sens','t=7 wks res', 
+                    't=10 wks sens', 't=10 wks res', 't=0 res lin', 't=0 sens lin'])
+
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'training set S'), 'TPclasslin'] = 'training set S'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'training set R'), 'TPclasslin'] = 'training set R'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclasslin'] = 't=0 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclasslin'] = 't=0 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclasslin'] = 't=7 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=7 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclasslin'] = 't=7 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.ClassEst == 'estimated S'), 'TPclasslin'] = 't=10 wks sens'
+adata.obs.loc[(adata.obs.timepoint=='t=10 wks') & (adata.obs.ClassEst == 'estimated R'), 'TPclasslin'] = 't=10 wks res'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.recalled_lin == 'res_lin'), 'TPclasslin'] = 't=0 res lin'
+adata.obs.loc[(adata.obs.timepoint=='t=0 wks') & (adata.obs.recalled_lin == 'sens_lin'), 'TPclasslin'] = 't=0 sens lin'
+#%%
 sc.pl.umap(adata,color=['TPclass'])
 sc.pl.umap(adata,color=['classLabel'])
-
+sc.pl.umap(adata,color='classLabel', palette = ['red', 'green'])
+sc.pl.umap(adata,color='ClassEst', palette = [ 'olivedrab','pink', 'red', 'green'])
+sc.pl.umap(adata,color='TPclass', palette = [ 'olivedrab','pink', 'gray', 'gray', 'gray', 'gray', 'red', 'green'])
+sc.pl.umap(adata,color='TPclass', palette = [ 'gray', 'gray',  'olivedrab','pink', 'gray', 'gray', 'red', 'green'])
+sc.pl.umap(adata,color='TPclass', palette = [ 'gray','gray', 'gray', 'gray', 'olivedrab','pink','red', 'green'])
+#%%
+sc.pl.umap(adata,color='TPclasslin', palette = [ 'magenta', 'lime', 'olivedrab','pink', 'gray', 'gray', 'gray', 'gray', 'red', 'green'])
+#%%
 
 adata_pre = adata[adata.obs['timepoint']=='t=0 wks', :]
 dfpre = pd.concat([adata_pre.obs['classLabel'],
@@ -352,6 +417,9 @@ dfphi.to_csv("phi_t_est_pythSVM.csv")
 sc.pl.umap(adata,color='TPclass', palette = [ 'red', 'green', 'gray', 'gray', 'gray', 'gray',]) 
 sc.pl.umap(adata,color='TPclass', palette = ['gray', 'gray', 'red', 'green', 'gray', 'gray']) 
 sc.pl.umap(adata,color='TPclass', palette = ['gray', 'gray', 'gray', 'gray', 'red', 'green']) 
+
+
+
 #%% Look at weights for each gene in the SVM
 # Order the weights
 ordered_indices = ((-np.abs(weights)).argsort()).transpose()
